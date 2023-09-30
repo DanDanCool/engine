@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core.h"
+#include "traits.h"
 
 namespace core {
 	enum {
@@ -24,34 +25,68 @@ namespace core {
 
 	u32 align_size256(u32 size);
 
-#ifdef JOLLY_DEBUG_HEAP
-#ifdef JOLLY_WIN32
-#define alloc256(sz) core::alloc256_dbg_win32_(sz, __FILE__, __LINE__)
-#define alloc8(sz) core::alloc8_dbg_win32_(sz, __FILE__, __LINE__)
-#define free256(ptr) core::free256_dbg_win32_(ptr)
-#define free8(ptr) core::free8_dbg_win32_(ptr)
-
-	void free256_dbg_win32_(void* ptr);
-	void free8_dbg_win32_(void* ptr);
-#endif
-#else
-#define alloc256(sz) core::alloc256_(sz)
-#define alloc8(sz) core::alloc8_(sz)
-#define free256(ptr) core::free256_(ptr)
-#define free8(ptr) core::free8_(ptr)
-#endif
-
-	memptr alloc256_(u32 size);
-	memptr alloc8_(u32 size);
+	memptr alloc256(u32 size);
+	memptr alloc8(u32 size);
 
 	memptr alloc256_dbg_win32_(u32 size, const char* fn, int ln);
 	memptr alloc8_dbg_win32_(u32 size, const char* fn, int ln);
 
-	void free256_(void* ptr);
-	void free8_(void* ptr);
+	void free256(void* ptr);
+	void free8(void* ptr);
 
 	void copy256(u8* src, u8* dst, u32 bytes);
 	void zero256(u8* dst, u32 bytes);
 	void copy8(u8* src, u8* dst, u32 bytes);
 	void zero8(u8* dst, u32 bytes);
+
+	template <typename T>
+	struct ptr {
+		using type = T;
+
+		ptr() = default;
+
+		// take ownership
+		ptr(cref<ptr<T>> other) : data(other.data) {
+			const_cast<ptr<T>&>(other).data = nullptr;
+		}
+
+		ref<ptr<T>> operator=(cref<ptr<T>> other) {
+			data = other.data;
+			const_cast<ptr<T>&>(other).data = nullptr;
+			return *this;
+		}
+
+		template<typename... Args>
+		ptr(Args&&... args) : data(nullptr) {
+			data = (type*)alloc8(sizeof(type)).data;
+			data = new (data) type(forward_data(args)...);
+		}
+
+		~ptr() {
+			if (!data) return;
+			destroy();
+		}
+
+		void destroy() {
+			cleanup<is_destructible<type>::value>();
+			free8(data);
+			data = nullptr;
+		}
+
+		type* operator->() const {
+			return data;
+		}
+
+		ref<type> ref() const {
+			return *data;
+		}
+
+		type* data;
+
+		private:
+		template<bool> void cleanup() {};
+		template<> void cleanup<true>() {
+			data->~type();
+		}
+	};
 }

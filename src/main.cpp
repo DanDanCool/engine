@@ -1,4 +1,5 @@
 #include "core/vector.h"
+#include "core/memory.h"
 #include "core/string.h"
 #include "core/table.h"
 #include <iostream>
@@ -14,16 +15,18 @@ struct foostruct {
 };
 
 int main() {
-	vector<int> v;
+	{
+		vector<int> v(0);
 
-	int a = {};
+		int a = {};
 
-	for (u32 i = 0; i < 32; i++) {
-		v.add(i);
+		for (u32 i = 0; i < 32; i++) {
+			v.add(i);
+		}
 	}
 
 	{
-		vector<foostruct> scopedv;
+		vector<foostruct> scopedv(0);
 		for (int i = 0; i < 10; i++) {
 			scopedv.add(foostruct(i));
 		}
@@ -40,13 +43,33 @@ int main() {
 		}
 	}
 
-	table<string, int> mytable;
-	mytable["hello"] = 69;
-	mytable["world"] = 4;
+	{
+		table<i32, i32> mytable;
+		for (i32 x : range(9999)) {
+			mytable[x] = x * 2;
+		}
 
-	std::cout << mytable["hello"] << std::endl;
+		i64 sum = 0;
+		for (i32 x : range(9999)) {
+			sum += mytable[x];
+		}
+		std::cout << sum << std::endl;
+	}
 
-	mytable.del("world");
+	{
+		ptr<string> scope("hello world");
+		ptr<int> a(4);
+		std::cout << scope->data << std::endl;
+		std::cout << a.ref() << std::endl;
 
-	std::cout << mytable["world"] << std::endl;
+		vector<ptr<int>> indirect(0);
+
+		for (int i : range(20)) {
+			indirect.add(ptr<int>(i));
+		}
+
+		for (cref<ptr<int>> p : reverse(indirect)) {
+			std::cout << p.ref() << std::endl;
+		}
+	}
 }

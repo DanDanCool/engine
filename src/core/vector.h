@@ -12,7 +12,8 @@ namespace core {
 	struct vector {
 		using type = T;
 
-		vector(u32 sz = 0)
+		vector() = default;
+		vector(u32 sz)
 		: data(nullptr), reserve(0), size(0) {
 			sz = max<u32>(sz, VECTOR_DEFAULT_SIZE);
 			memptr ptr = alloc256(sz * sizeof(type));
@@ -20,9 +21,39 @@ namespace core {
 			reserve = (u32)ptr.size / sizeof(type);
 		}
 
+		vector(vector<type>&& other)
+		: data(other.data), reserve(other.reserve), size(other.size) {
+			other.data = nullptr;
+			other.reserve = 0;
+			other.size = 0;
+		}
+
+		vector(cref<vector<type>>& other)
+		: data(other.data), reserve(other.reserve), size(other.size) {}
+
 		~vector() {
 			if (!data) return;
 			destroy();
+		}
+
+		ref<vector<type>> operator=(vector<type>&& other) {
+			data = other.data;
+			reserve = other.reserve;
+			size = other.size;
+
+			other.data = nullptr;
+			other.reserve = 0;
+			other.size = 0;
+
+			return *this;
+		}
+
+		ref<vector<type>> operator=(cref<vector<type>> other) {
+			data = other.data;
+			reserve = other.reserve;
+			size = other.size;
+
+			return *this;
 		}
 
 		void destroy() {
@@ -46,8 +77,16 @@ namespace core {
 				resize(reserve * 2);
 			}
 
-			copy<type>(val, data[size]);
-			size++;
+			copy<type>(val, data[size++]);
+		}
+
+		ref<type> add() {
+			if (reserve <= size) {
+				resize(reserve * 2);
+			}
+
+			u32 idx = size++;
+			return data[idx];
 		}
 
 		ref<type> del(u32 idx) {
@@ -113,7 +152,7 @@ namespace core {
 		private:
 		template<bool val> void cleanup() {};
 		template<> void cleanup<true>() {
-			for (u32 i = 0; i < size; i++) {
+			for (i32 i : range(size)) {
 				data[i].~type();
 			}
 		}

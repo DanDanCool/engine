@@ -18,10 +18,10 @@ namespace core {
 		};
 
 		table(u32 sz = 0)
-		: _hash(), _keys(), _vals(), reserve(0), size(0) {
+		: _hash(), _keys(), _vals(0), reserve(0), size(0) {
 			sz = table_size(max<u32>(sz, 100));
-			_hash.resize(sz);
-			_keys.resize(sz);
+			_hash = vector<hash_>(sz);
+			_keys = vector<key_type>(sz);
 			reserve = sz;
 		}
 
@@ -135,12 +135,28 @@ namespace core {
 					resize(reserve * 2);
 				}
 
-				idx = _vals.size;
-				_vals.size++;
-				return _vals[idx];
+				return _vals.add();
 			}
 
 			return _vals[_hash[idx].idx];
+		}
+
+		struct vals_view {
+			vals_view(cref<vector<val_type>> in) : data(in) {}
+
+			auto begin() {
+				return data.begin();
+			}
+
+			auto end() {
+				return data.end();
+			}
+
+			cref<vector<val_type>> data;
+		};
+
+		vals_view vals() {
+			return vals_view(_vals);
 		}
 
 		vector<hash_> _hash;
