@@ -69,7 +69,7 @@ namespace core {
 			copy256((u8*)data, ptr.data, align_size256(reserve * sizeof(type)));
 			free256((void*)data);
 			data = (type*)ptr.data;
-			reserve = ptr.size / sizeof(type);
+			reserve = (u32)(ptr.size / sizeof(type));
 		}
 
 		void add(cref<type> val) {

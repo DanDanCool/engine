@@ -80,7 +80,7 @@ namespace core {
 			return probe;
 		}
 
-		u32 find_(cref<key_type> key) const {
+		u32 _find(cref<key_type> key) const {
 			u32 h = hash(key);
 			for (i32 i : range(TABLE_PROBE)) {
 				u32 idx = (h + i) % reserve;
@@ -94,7 +94,7 @@ namespace core {
 		}
 
 		void set(cref<key_type> key, cref<val_type> val) {
-			u32 idx = find_(key);
+			u32 idx = _find(key);
 			if (idx != U32_MAX) {
 				_vals[_hash[idx].idx] = val;
 				return;
@@ -109,13 +109,13 @@ namespace core {
 		}
 
 		ref<val_type> get(cref<key_type> key) const {
-			u32 idx = find_(key);
+			u32 idx = _find(key);
 			assert(idx != U32_MAX);
 			return vals[hash[idx].idx];
 		}
 
 		void del(cref<key_type> key) {
-			u32 idx = find_(key);
+			u32 idx = _find(key);
 			assert(idx != U32_MAX);
 
 			zero8(bytes(_vals[_hash[idx].idx]), sizeof(val_type));
@@ -128,7 +128,7 @@ namespace core {
 		}
 
 		ref<val_type> operator[](cref<key_type> key) {
-			u32 idx = find_(key);
+			u32 idx = _find(key);
 			if (idx == U32_MAX) {
 				u32 p = probe(key, hash_{ hash(key), _vals.size });
 				if (p >= TABLE_PROBE) {

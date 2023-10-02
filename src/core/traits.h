@@ -1,6 +1,6 @@
 #pragma once
 
-#define move_data(...) static_cast<core::raw_type<decltype(__VA_ARGS__)>::type&&>(__VA_ARGS__)
+#define move_data(...) static_cast<core::raw_type_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
 #define forward_data(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
 
 namespace core {
@@ -31,6 +31,9 @@ namespace core {
 		typedef T type;
 	};
 
+	template <typename T>
+	using remove_ref_t = typename remove_ref<T>::type;
+
 	template<typename T>
 	struct remove_const {
 		typedef T type;
@@ -41,8 +44,14 @@ namespace core {
 		typedef T type;
 	};
 
+	template <typename T>
+	using remove_const_t = typename remove_const<T>::type;
+
 	template<typename T>
 	struct raw_type {
-		typedef typename remove_const<remove_ref<T>>::type type;
+		typedef remove_const_t<remove_ref_t<T>> type;
 	};
+
+	template <typename T>
+	using raw_type_t = typename raw_type<T>::type;
 }

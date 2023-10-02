@@ -3,6 +3,8 @@
 #include "core.h"
 #include "traits.h"
 
+#include <new>
+
 namespace core {
 	enum {
 		BLOCK_32 = 32,
@@ -39,30 +41,43 @@ namespace core {
 	void copy8(u8* src, u8* dst, u32 bytes);
 	void zero8(u8* dst, u32 bytes);
 
+	template <typename T> struct ptr;
+
 	template <typename T>
-	struct ptr {
+	struct ptr_base {
 		using type = T;
 
-		ptr() = default;
+		ptr_base() = default;
 
 		// take ownership
-		ptr(cref<ptr<T>> other) : data(other.data) {
-			const_cast<ptr<T>&>(other).data = nullptr;
+		ptr_base(cref<ptr_base<type>> other) : data(other.data) {
+			const_cast<ptr_base<type>&>(other) = nullptr;
 		}
 
-		ref<ptr<T>> operator=(cref<ptr<T>> other) {
+		ptr_base(ptr_base<type>&& other) : data(other.data) {
+			other.data = nullptr;
+		}
+
+		ptr_base(type* in) : data(in) {}
+
+		ref<ptr_base<type>> operator=(cref<ptr_base<type>> other) {
 			data = other.data;
-			const_cast<ptr<T>&>(other).data = nullptr;
+			const_cast<ptr_base<type>&>(other) = nullptr;
 			return *this;
 		}
 
-		template<typename... Args>
-		ptr(Args&&... args) : data(nullptr) {
-			data = (type*)alloc8(sizeof(type)).data;
-			data = new (data) type(forward_data(args)...);
+		ref<ptr_base<type>> operator=(ptr_base<type>&& other) {
+			data = other.data;
+			other.data = nullptr;
+			return *this;
 		}
 
-		~ptr() {
+		ref<ptr_base<type>> operator=(type* in) {
+			data = in;
+			return *this;
+		}
+
+		~ptr_base() {
 			if (!data) return;
 			destroy();
 		}
@@ -73,20 +88,54 @@ namespace core {
 			data = nullptr;
 		}
 
+		operator type*() const {
+			return data;
+		}
+
 		type* operator->() const {
 			return data;
 		}
 
-		ref<type> ref() const {
-			return *data;
+		template <typename S>
+		ptr<S> cast() {
+			ptr<S> p((S*)data);
+			data = nullptr;
+			return p;
 		}
 
 		type* data;
 
 		private:
-		template<bool> void cleanup() {};
+		template<bool> void cleanup() {}
 		template<> void cleanup<true>() {
 			data->~type();
 		}
 	};
+
+	template <typename T>
+	struct ptr : public ptr_base<T> {
+		using ptr_base::ptr_base;
+		using type = T;
+
+		ref<type> ref() const {
+			return *ptr_base::data;
+		}
+	};
+
+	template<>
+	struct ptr<void> : public ptr_base<void> {
+		using ptr_base::ptr_base;
+
+		template<typename S>
+		ref<S> ref() const {
+			return *(S*)ptr_base::data;
+		}
+	};
+
+	template<typename T, typename... Args>
+	ptr<T> ptr_create(Args&&... args) {
+		T* data = (T*)alloc8(sizeof(T)).data;
+		data = new (data) T(forward_data(args)...);
+		return move_data(ptr<T>(data));
+	}
 }

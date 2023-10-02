@@ -1,15 +1,16 @@
 #pragma once
 
-#include "core/system.h"
+#include <engine/system.h>
 
 namespace jolly {
-	struct render_thread : public system {
+	struct render_thread : public system_thread {
 		render_thread();
 		~render_thread();
 
-		void init();
-		void term();
+		virtual void init();
+		virtual void term();
 
-		void step(f32 ms);
+		virtual void run();
+		virtual void step(f32 ms);
 	};
 }

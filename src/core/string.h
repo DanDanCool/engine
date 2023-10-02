@@ -12,13 +12,14 @@ namespace core {
 		string_base() = default;
 		string_base(const type* str)
 		: data(nullptr), size(0) {
-			u64 bytes = 0;
-			while (str[bytes]) {
-				bytes++;
+			u64 count = 0;
+			while (str[count]) {
+				count++;
 			}
 
-			memptr ptr = alloc256(bytes * sizeof(type));
-			copy8((u8*)str, ptr.data, bytes * sizeof(type));
+			u32 bytes = (u32)(count * sizeof(type));
+			memptr ptr = alloc256(bytes);
+			copy8((u8*)str, ptr.data, bytes);
 
 			data = (type*)ptr.data;
 			size = bytes;
@@ -26,9 +27,9 @@ namespace core {
 
 		string_base(cref<string_base> other)
 			: data(nullptr), size(other.size) {
-				u32 size = other.size * sizeof(type);
+				u32 size = (u32)(other.size * sizeof(type));
 				memptr ptr = alloc256(size);
-				copy256((u8*)other.data, ptr.data, ptr.size);
+				copy256((u8*)other.data, ptr.data, (u32)ptr.size);
 				data = (type*)ptr.data;
 			}
 
@@ -119,7 +120,7 @@ namespace core {
 	template <typename T>
 		struct hash_info<string_base<T>> {
 			static u32 hash(cref<string_base<T>> key) {
-				return fnv1a((u8*)key.data, key.size * sizeof(T));
+				return fnv1a((u8*)key.data, (u32)(key.size * sizeof(T)));
 			}
 		};
 
