@@ -14,7 +14,13 @@ namespace core {
 	struct is_destructible : public basic_constant<bool, __is_destructible(T)> {};
 
 	template <typename T>
+	inline constexpr bool is_destructible_v = is_destructible<T>::value;
+
+	template <typename T>
 	struct is_constructible : public basic_constant<bool, __is_constructible(T)> {};
+
+	template <typename T>
+	inline constexpr bool is_constructible_v = is_constructible<T>::value;
 
 	template<typename T>
 	struct remove_ref {

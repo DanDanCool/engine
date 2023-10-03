@@ -3,6 +3,7 @@
 #include "core.h"
 #include "simd.h"
 #include "memory.h"
+#include "operations.h"
 
 namespace core {
 	template<typename T>
@@ -17,25 +18,60 @@ namespace core {
 				count++;
 			}
 
-			u32 bytes = (u32)(count * sizeof(type));
+			u32 bytes = (u32)((count + 1) * sizeof(type));
 			memptr ptr = alloc256(bytes);
 			copy8((u8*)str, ptr.data, bytes);
 
 			data = (type*)ptr.data;
-			size = bytes;
+			size = count;
 		}
 
+		string_base(type* str, u64 size)
+		: data(str), size(size) {}
+
 		string_base(cref<string_base> other)
-			: data(nullptr), size(other.size) {
-				u32 size = (u32)(other.size * sizeof(type));
-				memptr ptr = alloc256(size);
-				copy256((u8*)other.data, ptr.data, (u32)ptr.size);
-				data = (type*)ptr.data;
-			}
+		: data(nullptr), size(0) {
+			*this = other;
+		}
+
+		string_base(string_base&& other)
+		: data(nullptr), size(0) {
+			*this = other;
+		}
 
 		~string_base() {
 			if (!data) return;
 			free256((void*)data);
+		}
+
+		ref<string_base> operator=(cref<string_base> other) {
+			u32 bytes = (u32)((other.size + 1) * sizeof(type));
+			memptr ptr = alloc256(bytes);
+			copy256((u8*)other.data, ptr.data, align_size256(bytes));
+			data = (type*)ptr.data;
+			size = other.size;
+			return *this;
+		}
+
+		ref<string_base> operator=(string_base&& other) {
+			data = other.data;
+			size = other.size;
+
+			other.data = nullptr;
+			other.size = 0;
+			return *this;
+		}
+
+		template <typename S>
+		string_base<S> cast() const {
+			u32 bytes = (u32)((size + 1) * sizeof(S));
+			memptr ptr = alloc256(bytes);
+			S* buf = (S*)ptr.data;
+			for (int i : range(bytes)) {
+				buf[i] = (S)data[i];
+			}
+
+			return string_base<S>(buf, bytes);
 		}
 
 		cref<type> operator[](u32 idx) const {

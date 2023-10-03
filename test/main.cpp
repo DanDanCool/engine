@@ -7,6 +7,8 @@
 
 using namespace core;
 
+const cstr DIVIDE = "----------------";
+
 struct foostruct {
 	foostruct(cref<int> in) : data(in) {}
 	~foostruct() {
@@ -21,6 +23,7 @@ struct basicstruct {
 };
 
 void test_thread() {
+	std::cout << DIVIDE << "thread" << std::endl;
 	ptr<basicstruct> myptr = ptr_create<basicstruct>(1, 2, 3, 4);
 
 	auto coroutine = [](ref<thread>, ptr<void> in) -> int {
@@ -37,6 +40,7 @@ void test_thread() {
 }
 
 void test_vector() {
+	std::cout << DIVIDE << "vector" << std::endl;
 	vector<int> v(0);
 
 	int a = {};
@@ -56,6 +60,7 @@ void test_vector() {
 }
 
 void test_string() {
+	std::cout << DIVIDE << "string" << std::endl;
 	string s("hello world!");
 	for (auto x : forward(s)) {
 		std::cout << x << std::endl;
@@ -63,19 +68,34 @@ void test_string() {
 }
 
 void test_table() {
+	std::cout << DIVIDE << "table" << std::endl;
 	table<i32, i32> mytable;
-	for (i32 x : range(9999)) {
-		mytable[x] = x * 2;
+	for (i32 x : range(128)) {
+		mytable[x] = x;
 	}
 
 	i64 sum = 0;
-	for (i32 x : range(9999)) {
-		sum += mytable[x];
+	for (i32 x : range(128)) {
+		std::cout << x << " " << mytable[x] << std::endl;
 	}
-	std::cout << sum << std::endl;
+
+	table<string, i32> words;
+	const vector<string> sentence = { "the", "quick", "brown", "fox", "jumps", "over", "the2", "lazy", "dog" };
+	for (int i : range(sentence.size)) {
+		words[sentence[i]] = i;
+	}
+
+	words.del("quick");
+	words.del("brown");
+	words.del("lazy");
+
+	for (auto& [key, val] : words) {
+		std::cout << key << " " << val << std::endl;
+	}
 }
 
 void test_ptr() {
+	std::cout << DIVIDE << "ptr" << std::endl;
 	ptr<string> scope = ptr_create<string>("hello world");
 	ptr<int> a = ptr_create<int>(4);
 	std::cout << scope->data << std::endl;

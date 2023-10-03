@@ -2,6 +2,7 @@
 
 #include <core/core.h>
 #include <core/thread.h>
+#include <core/lock.h>
 
 namespace jolly {
 	struct system {

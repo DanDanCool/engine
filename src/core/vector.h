@@ -6,6 +6,8 @@
 #include "iterator.h"
 #include "operations.h"
 
+#include <initializer_list>
+
 namespace core {
 	const u32 VECTOR_DEFAULT_SIZE = 32;
 	template<typename T>
@@ -15,10 +17,7 @@ namespace core {
 		vector() = default;
 		vector(u32 sz)
 		: data(nullptr), reserve(0), size(0) {
-			sz = max<u32>(sz, VECTOR_DEFAULT_SIZE);
-			memptr ptr = alloc256(sz * sizeof(type));
-			data = (type*)ptr.data;
-			reserve = (u32)ptr.size / sizeof(type);
+			_allocate(sz);
 		}
 
 		vector(vector<type>&& other)
@@ -30,6 +29,14 @@ namespace core {
 
 		vector(cref<vector<type>>& other)
 		: data(other.data), reserve(other.reserve), size(other.size) {}
+
+		vector(std::initializer_list<type> l)
+		: data(nullptr), reserve(0), size(0) {
+			_allocate(0);
+			for (auto item : l) {
+				add(item);
+			}
+		}
 
 		~vector() {
 			if (!data) return;
@@ -56,8 +63,27 @@ namespace core {
 			return *this;
 		}
 
+		ref<vector<type>> operator=(std::initializer_list<type> l) {
+			_allocate(0);
+			for (auto item : l) {
+				add(item);
+			}
+
+			return *this;
+		}
+
+		void _allocate(u32 sz) {
+			sz = max<u32>(sz, VECTOR_DEFAULT_SIZE);
+			memptr ptr = alloc256(sz * sizeof(type));
+			data = (type*)ptr.data;
+			reserve = (u32)ptr.size / sizeof(type);
+		}
+
 		void destroy() {
-			cleanup<is_destructible<type>::value>();
+			for (int i : range(size)) {
+				_cleanup<is_destructible_v<type>>(data[i]);
+			}
+
 			free256((void*)data);
 			data = nullptr;
 			reserve = 0;
@@ -89,10 +115,11 @@ namespace core {
 			return data[idx];
 		}
 
-		ref<type> del(u32 idx) {
+		void del(u32 idx) {
 			size--;
-			swap<type>(ref(data[idx]), ref(data[size]));
-			return ref(data[size]);
+			_cleanup<is_destructible_v<type>>(data[idx]);
+			copy8(bytes(data[size]), bytes(data[idx]), sizeof(type));
+			zero8(bytes(data[size]), sizeof(type));
 		}
 
 		ref<type> operator[](u32 idx) const {
@@ -115,7 +142,7 @@ namespace core {
 
 		struct forward_iterator : public iterator_base {
 			forward_iterator(type* in) : iterator_base(in) {}
-			forward_iterator& operator++() {
+			ref<forward_iterator> operator++() {
 				data++;
 				return *this;
 			}
@@ -131,7 +158,7 @@ namespace core {
 
 		struct reverse_iterator : public iterator_base {
 			reverse_iterator(type* in): iterator_base(in) {}
-			reverse_iterator& operator++() {
+			ref<reverse_iterator> operator++() {
 				data--;
 				return *this;
 			}
@@ -145,16 +172,13 @@ namespace core {
 			return reverse_iterator(&data[-1]);
 		}
 
+		template<bool val> void _cleanup(ref<type> obj) {};
+		template<> void _cleanup<true>(ref<type> obj) {
+				obj.~type();
+		}
+
 		type* data;
 		u32 reserve;
 		u32 size;
-
-		private:
-		template<bool val> void cleanup() {};
-		template<> void cleanup<true>() {
-			for (i32 i : range(size)) {
-				data[i].~type();
-			}
-		}
 	};
 }

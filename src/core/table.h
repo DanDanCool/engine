@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tuple.h"
 #include "vector.h"
 
 namespace core {
@@ -12,15 +13,11 @@ namespace core {
 		using key_type = K;
 		using val_type = V;
 
-		struct hash_ {
-			u32 hash;
-			u32 idx;
-		};
-
 		table(u32 sz = 0)
-		: _hash(), _keys(), _vals(0), reserve(0), size(0) {
+		: _hash(), _keys(), _vals(0), reserve(0), size(0), _sparse(), _dense(0)  {
 			sz = table_size(max<u32>(sz, 100));
-			_hash = vector<hash_>(sz);
+			_sparse = vector<u32>(sz);
+			_hash = vector<u32>(sz);
 			_keys = vector<key_type>(sz);
 			reserve = sz;
 		}
@@ -33,50 +30,54 @@ namespace core {
 		void resize(u32 sz) {
 			sz = table_size(sz);
 
-			vector<hash_> nhash = _hash;
+			vector<u32> nhash = _hash;
 			vector<key_type> nkeys = _keys;
+			vector<u32> nsparse = _sparse;
 
-			_hash = vector<hash_>(sz);
+			_hash = vector<u32>(sz);
 			_keys = vector<key_type>(sz);
+			_sparse = vector<u32>(sz);
 
 			u32 count = reserve;
 			reserve = sz;
 			for (i32 i : range(count)) {
-				cref<hash_> h = nhash[i];
-				if (!h.hash) continue;
-				probe(nkeys[i], h);
+				u32 hash = nhash[i];
+				if (!hash) continue;
+				_probe(nkeys[i], hash, nsparse[i]);
 			}
 		}
 
-		u32 probe(key_type key, hash_ h) {
+		u32 _probe(key_type key, u32 hash, u32 dense) {
 			if (reserve <= size) {
 				resize(reserve * 2);
 			}
 
 			u32 probe = 0;
-			u32 i = h.hash % reserve;
+			u32 i = hash % reserve;
 
 			while (true) {
-				ref<hash_> cur = _hash[i];
-				if (!cur.hash) {
-					cur = h;
+				u32 cur = _hash[i];
+				if (!cur) {
+					_hash[i] = hash;
 					_keys[i] = key;
+					_sparse[i] = dense;
+					_dense[dense] = i;
 					break;
 				}
 
-				u32 dist = (cur.hash % reserve) - i;
+				u32 dist = (cur % reserve) - i;
 				if (dist < probe) {
-					swap(cur, h);
+					_dense[dense] = i;
+
+					swap(_hash[i], hash);
 					swap(_keys[i], key);
+					swap(_sparse[i], dense);
 				}
 
 				i = (i + 1) % reserve;
 				probe++;
 			}
 
-			key = {}; // do this to prevent freeing of memory
-
-			size++;
 			return probe;
 		}
 
@@ -84,8 +85,8 @@ namespace core {
 			u32 h = hash(key);
 			for (i32 i : range(TABLE_PROBE)) {
 				u32 idx = (h + i) % reserve;
-				cref<hash_> tmp = _hash[idx];
-				if (tmp.hash == h) {
+				u32 tmp = _hash[idx];
+				if (tmp == h) {
 					if (key == _keys[idx]) return idx;
 				}
 			}
@@ -93,15 +94,21 @@ namespace core {
 			return U32_MAX;
 		}
 
+		bool has(cref<key_type> key) const {
+			return _find(key) != U32_MAX;
+		}
+
 		void set(cref<key_type> key, cref<val_type> val) {
 			u32 idx = _find(key);
 			if (idx != U32_MAX) {
-				_vals[_hash[idx].idx] = val;
+				_vals[_sparse[idx]] = val;
 				return;
 			}
 
-			u32 p = probe(key, hash_{ hash(key), _vals.size });
+			_dense.add() = 0;
+			u32 p = _probe(key, hash(key), _vals.size);
 			_vals.add(val);
+			size++;
 
 			if (p >= TABLE_PROBE) {
 				resize(reserve * 2);
@@ -111,16 +118,25 @@ namespace core {
 		ref<val_type> get(cref<key_type> key) const {
 			u32 idx = _find(key);
 			assert(idx != U32_MAX);
-			return vals[hash[idx].idx];
+			return _vals[_sparse[idx]];
 		}
 
 		void del(cref<key_type> key) {
 			u32 idx = _find(key);
 			assert(idx != U32_MAX);
 
-			zero8(bytes(_vals[_hash[idx].idx]), sizeof(val_type));
-			zero8(bytes(_hash[idx]), sizeof(hash_));
-			zero8(bytes(_keys[idx]), sizeof(key_type));
+			_dense.del(_sparse[idx]);
+			_vals.del(_sparse[idx]);
+			_sparse[_dense[_sparse[idx]]] = _sparse[idx];
+
+			ref<key_type> _key = _keys[idx];
+			_keys._cleanup<is_destructible_v<key_type>>(_key);
+			zero8(bytes(_key), sizeof(key_type));
+
+			_hash[idx] = 0;
+			_sparse[idx] = 0;
+
+			size--;
 		}
 
 		ref<val_type> operator[](cref<key_type> key) const {
@@ -130,19 +146,21 @@ namespace core {
 		ref<val_type> operator[](cref<key_type> key) {
 			u32 idx = _find(key);
 			if (idx == U32_MAX) {
-				u32 p = probe(key, hash_{ hash(key), _vals.size });
+				_dense.add() = 0;
+				u32 p = _probe(key, hash(key), _vals.size);
 				if (p >= TABLE_PROBE) {
 					resize(reserve * 2);
 				}
 
+				size++;
 				return _vals.add();
 			}
 
-			return _vals[_hash[idx].idx];
+			return _vals[_sparse[idx]];
 		}
 
-		struct vals_view {
-			vals_view(cref<vector<val_type>> in) : data(in) {}
+		struct val_view {
+			val_view(cref<vector<val_type>> in) : data(in) {}
 
 			auto begin() {
 				return data.begin();
@@ -155,13 +173,88 @@ namespace core {
 			cref<vector<val_type>> data;
 		};
 
-		vals_view vals() {
-			return vals_view(_vals);
+		val_view vals() {
+			return val_view(_vals);
 		}
 
-		vector<hash_> _hash;
+		struct key_view {
+			key_view(cref<vector<key_type>> _keys, cref<vector<u32>> _dense)
+			: keys(_keys), dense(_dense) {}
+
+			struct iterator {
+				iterator(cref<vector<key_type>> _keys, u32* _idx) : keys(_keys), idx(_idx) {}
+
+				ref<iterator> operator++() {
+					idx++;
+					return *this;
+				}
+
+				bool operator!=(cref<iterator> other) const {
+					return idx != other.idx;
+				}
+
+				ref<key_type> operator*() const {
+					return keys[*idx];
+				}
+
+				cref<vector<key_type>> keys;
+				u32* idx;
+			};
+
+			auto begin() {
+				return iterator(keys, &dense[0]);
+			}
+
+			auto end() {
+				return iterator(keys, &dense[dense.size]);
+			}
+
+			cref<vector<key_type>> keys;
+			cref<vector<u32>> dense;
+		};
+
+		key_view keys() {
+			return key_view(_keys, _dense);
+		}
+
+		struct iterator {
+			using pair_type = pair<ref<key_type>, ref<val_type>>;
+
+			iterator(cref<vector<key_type>> _keys, cref<vector<val_type>> _vals, cref<vector<u32>> _dense, u32 _idx)
+			: keys(_keys), vals(_vals), dense(_dense), idx(_idx) {}
+
+			ref<iterator> operator++() {
+				idx++;
+				return *this;
+			}
+
+			bool operator!=(cref<iterator> other) const {
+				return idx != other.idx;
+			}
+
+			pair_type operator*() const {
+				return pair_type(keys[dense[idx]], vals[idx]);
+			}
+
+			cref<vector<key_type>> keys;
+			cref<vector<val_type>> vals;
+			cref<vector<u32>> dense;
+			u32 idx;
+		};
+
+		auto begin() {
+			return iterator(_keys, _vals, _dense, 0);
+		}
+
+		auto end() {
+			return iterator(_keys, _vals, _dense, size);
+		}
+
+		vector<u32> _hash;
 		vector<key_type> _keys;
 		vector<val_type> _vals;
+		vector<u32> _sparse;
+		vector<u32> _dense;
 		u32 reserve;
 		u32 size;
 	};

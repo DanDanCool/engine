@@ -61,12 +61,22 @@ typedef double f64;
 
 template <typename T, typename S>
 ref<T> cast(ref<S> val) {
-	return ref<T>(*(T*)&val);
+	return *(T*)&val;
 }
 
 template <typename T, typename S>
 cref<T> cast(cref<S> val) {
-	return cref<T>(*(T*)&val);
+	return *(T*)&val;
+}
+
+template <typename T, typename S>
+ref<T> cast(S* val) {
+	return *(T*)val;
+}
+
+template <typename T, typename S>
+cref<T> cast(const S* val) {
+	return *(T*)val;
 }
 
 template <typename T>
