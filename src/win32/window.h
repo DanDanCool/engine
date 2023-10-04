@@ -7,6 +7,8 @@
 #include <core/table.h>
 #include <core/lock.h>
 
+struct VkExtensionProperties;
+
 namespace jolly {
 	enum class win_event {
 		close,
@@ -26,6 +28,8 @@ namespace jolly {
 		u32 create(cref<core::string> name, core::pair<u32, u32> sz = {1280, 720});
 
 		void step(f32 ms);
+
+		core::vector<cstr> vkextensions(cref<core::vector<VkExtensionProperties>> extensions);
 
 		void vsync(bool sync);
 		bool vsync() const;

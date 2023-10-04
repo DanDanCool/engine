@@ -21,10 +21,8 @@ namespace core {
 		}
 
 		vector(vector<type>&& other)
-		: data(other.data), reserve(other.reserve), size(other.size) {
-			other.data = nullptr;
-			other.reserve = 0;
-			other.size = 0;
+		: data(nullptr), reserve(0), size(0) {
+			*this = other;
 		}
 
 		vector(cref<vector<type>>& other)
@@ -32,10 +30,7 @@ namespace core {
 
 		vector(std::initializer_list<type> l)
 		: data(nullptr), reserve(0), size(0) {
-			_allocate(0);
-			for (auto item : l) {
-				add(item);
-			}
+			*this = l;
 		}
 
 		~vector() {
@@ -65,7 +60,7 @@ namespace core {
 
 		ref<vector<type>> operator=(std::initializer_list<type> l) {
 			_allocate(0);
-			for (auto item : l) {
+			for (auto& item : l) {
 				add(item);
 			}
 

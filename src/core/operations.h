@@ -28,6 +28,13 @@ namespace core {
 			return val ? a : b;
 		}
 
+	template <typename T1, typename T2>
+		bool cmpeq(cref<T1> a, cref<T2> b) {
+			return a == b;
+		}
+
+	bool cmpeq(cstr a, cstr b);
+
 	template <typename T>
 		cref<T> max(cref<T> a, cref<T> b) {
 			bool val = a > b;

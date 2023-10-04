@@ -86,6 +86,15 @@ namespace core {
 		buf.write(arg);
 	}
 
+	template <>
+	void format<cstr>(cref<cstr> arg, ref<fmtbuf> buf) {
+		i8* p = (i8*)arg;
+		while (*p) {
+			buf.write((u8)*p);
+			p++;
+		}
+	}
+
 	template<>
 	void format<i64>(cref<i64> arg, ref<fmtbuf> buf) {
 		array<i8, 20> data;

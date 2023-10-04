@@ -6,6 +6,8 @@
 #include <windows.h>
 #include <winuser.h>
 
+#include <vulkan/vulkan.h>
+
 namespace jolly {
 	const auto* WNDCLASS_NAME = L"JOLLY_WNDCLASS";
 
@@ -91,6 +93,23 @@ namespace jolly {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
+	}
+
+	core::vector<cstr> window::vkextensions(cref<core::vector<VkExtensionProperties>> extensions) {
+		bool surface = false, win32_surface = false;
+		for (auto& extension : extensions) {
+			if (core::cmpeq(extension.extensionName, "VK_KHR_surface")) {
+				surface = true;
+			}
+
+			if (core::cmpeq(extension.extensionName, "VK_KHR_win32_surface")) {
+				win32_surface = true;
+			}
+		}
+
+		assert(surface && win32_surface);
+
+		return core::vector{ "VK_KHR_surface", "VK_KHR_win32_surface" };
 	}
 
 	void window::vsync(bool sync) {

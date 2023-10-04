@@ -4,6 +4,8 @@
 #include <core/memory.h>
 #include <core/tuple.h>
 
+#include <vulkan/vulkan.h>
+
 namespace jolly {
 	struct window;
 	struct vk_device {
@@ -14,5 +16,7 @@ namespace jolly {
 		void step(f32 ms);
 
 		core::ptr<window> _window;
+		VkInstance _instance;
+		VkDebugUtilsMessengerEXT _debugmsg;
 	};
 }
