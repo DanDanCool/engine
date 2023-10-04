@@ -1,8 +1,8 @@
 #include "window.h"
 
+#include <core/log.h>
 #include <engine/engine.h>
 
-#include <iostream>
 #include <windows.h>
 #include <winuser.h>
 
@@ -31,11 +31,10 @@ namespace jolly {
 
 	window::~window() {
 		// we stop looking through the message queue so delete manually
-		for (i32 i : core::range(windows.size, 0, -1)) {
-			i = i - 1;
-			HWND hwnd = (HWND)windows[i].data;
+		for (auto& [i, hwnd] : windows) {
 			windestroycb(*this, i, win_event::destroy);
-			DestroyWindow((HWND)hwnd);
+			DestroyWindow((HWND)hwnd.data);
+			hwnd = nullptr;
 		}
 
 		UnregisterClassW(WNDCLASS_NAME, (HINSTANCE)handle.data);
@@ -45,9 +44,6 @@ namespace jolly {
 	void window::_defaults() {
 		auto closecb = [](ref<window> state, u32 id, win_event event) {
 			DestroyWindow((HWND)state.windows[id].data);
-			if (!state.windows.size) {
-				PostQuitMessage(0);
-			}
 		};
 
 		addcb(win_event::close, closecb);
@@ -78,7 +74,7 @@ namespace jolly {
 		ShowWindow(win, SW_SHOW);
 		UpdateWindow(win);
 
-		windows[windows.size] = core::ptr<void>((void*)win);
+		windows[id] = core::ptr<void>((void*)win);
 		return id;
 	}
 
@@ -86,7 +82,7 @@ namespace jolly {
 		MSG msg;
 		while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			if (msg.message == WM_QUIT) {
-				std::cout << "wm_quit" << std::endl;
+				LOG_INFO("wm_quit");
 				ref<engine> instance = engine::instance();
 				instance.stop();
 			}
@@ -136,6 +132,10 @@ namespace jolly {
 
 		state.windows.del(id);
 		hwnd = nullptr;
+
+		if (!state.windows.size) {
+			PostQuitMessage(0);
+		}
 	}
 
 	LRESULT wndproc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam) {
@@ -152,7 +152,7 @@ namespace jolly {
 		switch (umsg) {
 			case WM_CLOSE: {
 				// do something here
-				std::cout << "wm_close" << std::endl;
+				LOG_INFO("wm_close");
 				state.callback(id, win_event::close);
 				break;
 			}

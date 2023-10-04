@@ -79,8 +79,22 @@ cref<T> cast(const S* val) {
 	return *(T*)val;
 }
 
+template <typename S>
+bool cast(cref<S> val) {
+	return (bool)val;
+}
+
 template <typename T>
 u8* bytes(cref<T> val) {
 	return (u8*)&val;
 }
 
+#define ENUM_CLASS_OPERATORS(enum) \
+	enum operator|(enum a, enum b) { \
+		i64 res = (i64)a | (i64)b; \
+		return (enum)res; \
+	} \
+	enum operator&(enum a, enum b) { \
+		i64 res = (i64)a & (i64)b; \
+		return (enum)res; \
+	} \

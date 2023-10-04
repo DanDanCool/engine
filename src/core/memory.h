@@ -138,4 +138,48 @@ namespace core {
 		data = new (data) T(forward_data(args)...);
 		return move_data(ptr<T>(data));
 	}
+
+	template<u32 N>
+	struct buffer_base {
+		static constexpr u32 size = N;
+		buffer_base() : data(), index(0) {
+			data = alloc256(N).data;
+		}
+
+		buffer_base(u8* buf) : data(buf), index(0) {}
+
+		~buffer_base() {
+			free256(data);
+			data = nullptr;
+		}
+
+		memptr write(memptr buf) {
+			u64 bytes = min(buf.size, size - index);
+			copy8(buf.data, data + index, (u32)bytes);
+
+			index += bytes;
+			return memptr{ buf.data + bytes, buf.size - bytes };
+		}
+
+		memptr read(memptr buf) {
+			u64 bytes = min(buf.size, index);
+			copy8(data, buf.data, bytes);
+
+			index -= bytes;
+			copy8(data + bytes, data, index);
+			zero8(data + index, bytes);
+
+			return memptr{ buf.data + bytes, buf.size - bytes };
+		}
+
+		void flush() {
+			zero256(data, size);
+			index = 0;
+		}
+
+		ptr<u8> data;
+		u64 index;
+	};
+
+	using buffer = buffer_base<BLOCK_4096>;
 }

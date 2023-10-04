@@ -3,6 +3,7 @@
 #include <core/string.h>
 #include <core/table.h>
 #include <core/thread.h>
+#include <core/log.h>
 #include <iostream>
 
 using namespace core;
@@ -119,10 +120,18 @@ void test_ptr() {
 	}
 }
 
+void test_log() {
+	std::cout << DIVIDE << "log" << std::endl;
+	LOG_INFO("this is info");
+	LOG_WARN("this is a warning");
+	LOG_CRIT("this is a critical error");
+}
+
 int main() {
 	test_thread();
 	test_vector();
 	test_string();
 	test_table();
 	test_ptr();
+	test_log();
 }

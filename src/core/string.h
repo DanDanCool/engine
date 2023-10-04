@@ -103,6 +103,10 @@ namespace core {
 			return data;
 		}
 
+		operator memptr() const {
+			return memptr{ (u8*)data, size * sizeof(type) };
+		}
+
 		struct iterator_base {
 			iterator_base(type* in) : data(in) {}
 

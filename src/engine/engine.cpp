@@ -3,12 +3,11 @@
 #include <core/timer.h>
 
 namespace jolly {
-	engine* engine::_instance = nullptr;
+	core::ptr<engine> engine::_instance = nullptr;
 
 	engine::engine()
 	: _systems(), _lock(), _run(true) {
-		assert(_instance == nullptr);
-		_instance = this;
+		assert(_instance.data == nullptr);
 	}
 
 	engine::~engine() {
@@ -48,6 +47,10 @@ namespace jolly {
 	}
 
 	ref<engine> engine::instance() {
+		if (!_instance) {
+			_instance = core::ptr_create<engine>();
+		}
+
 		return *_instance;
 	}
 }

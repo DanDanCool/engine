@@ -24,6 +24,6 @@ namespace jolly {
 		core::mutex _lock;
 		core::atom<bool> _run;
 
-		static engine* _instance;
+		static core::ptr<engine> _instance;
 	};
 }
