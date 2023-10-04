@@ -28,6 +28,10 @@ if host.os == jmake.Platform.WIN32:
     test.define('JOLLY_WIN32', 1)
     test.define('WIN32_LEAN_AND_MEAN', 1)
 
+vulkan = jmake.package("vulkan")
+engine.depend(vulkan)
+test.depend(vulkan)
+
 workspace.add(engine)
 workspace.add(test)
 jmake.generate(workspace)

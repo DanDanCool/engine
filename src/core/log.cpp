@@ -5,6 +5,9 @@
 
 #include <cstdio>
 
+#define FORMAT_INT(type) \
+template<> void format<type>(cref<type> arg, ref<fmtbuf> buf) { format<i64>((i64)arg, buf); }
+
 namespace core {
 	struct sink {
 		sink() = default;
@@ -44,28 +47,30 @@ namespace core {
 		_sink->flush();
 	}
 
-	void logger::_write(cref<string> info, cref<string> log) {
-		_sink->write(info);
+	void logger::log(logger::severity level, cref<string> log) {
+		switch (level) {
+			case severity::info: {
+				const char data[] = "info: ";
+				_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+				break;
+								 }
+			case severity::warn: {
+				const char data[] = "warn: ";
+				_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+				break;
+								 }
+			case severity::crit: {
+				const char data[] = "crit: ";
+				_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+				break;
+								 }
+		}
 
-		cstr delim = ": ";
-		_sink->write(memptr{ (u8*)delim, 2 });
 		_sink->write(log);
 
 		cstr newline = "\n";
 		_sink->write(memptr{ (u8*)newline, 1 });
 		_sink->flush();
-	}
-
-	void logger::info(cref<string> log) {
-		_write("info", log);
-	}
-
-	void logger::warn(cref<string> log) {
-		_write("warn", log);
-	}
-
-	void logger::crit(cref<string> log) {
-		_write("crit", log);
 	}
 
 	ref<logger> logger::instance() {
@@ -75,4 +80,42 @@ namespace core {
 
 		return *_instance;
 	}
+
+	template<>
+	void format<string>(cref<string> arg, ref<fmtbuf> buf) {
+		buf.write(arg);
+	}
+
+	template<>
+	void format<i64>(cref<i64> arg, ref<fmtbuf> buf) {
+		array<i8, 20> data;
+
+		i64 tmp = abs(arg);
+		i64 div = 10;
+
+		while (tmp) {
+			i64 val = tmp % div;
+			tmp -= val;
+			data.add('0' + (i8)val);
+			tmp /= div;
+		}
+
+		if (arg < 0) {
+			buf.write((u8)'-');
+		}
+
+		for (int i : range(data.index, 0, -1)) {
+			i--;
+			if (buf.index >= fmtbuf::size) return;
+			buf.write((u8)data[i]);
+		}
+	}
+
+	FORMAT_INT(i8);
+	FORMAT_INT(i16);
+	FORMAT_INT(i32);
+	FORMAT_INT(u8);
+	FORMAT_INT(u16);
+	FORMAT_INT(u32);
+	FORMAT_INT(u64);
 }

@@ -1,11 +1,13 @@
 #include "render_thread.h"
-#include <engine/engine.h>
 
 #include <core/timer.h>
+#include <engine/engine.h>
+
+#include "vk_device.h"
 
 namespace jolly {
 	render_thread::render_thread()
-	: system_thread(), _window(), _run(true) {
+	: system_thread(), _device(), _run(true) {
 	}
 
 	render_thread::~render_thread() {
@@ -23,19 +25,14 @@ namespace jolly {
 	}
 
 	void render_thread::run() {
-		_window = core::ptr_create<window>("jolly");
-
-		core::pair<u32, u32> size = { 200, 200 };
-		for (int i : core::range(5)) {
-			_window->create("foo", size);
-		}
+		_device = core::ptr_create<vk_device>("jolly");
 
 		f32 dt = 0;
 		bool run = _run.get(core::memory_order::relaxed);
 
 		while (run) {
 			core::timer timer(dt);
-			_window->step(dt);
+			_device->step(dt);
 			run = _run.get(core::memory_order::relaxed);
 		}
 	}

@@ -149,8 +149,15 @@ namespace core {
 		buffer_base(u8* buf) : data(buf), index(0) {}
 
 		~buffer_base() {
+			if (!data) return;
 			free256(data);
 			data = nullptr;
+		}
+
+		u32 write(u8 character) {
+			if (index >= size) return 0;
+			data[index++] = character;
+			return 1;
 		}
 
 		memptr write(memptr buf) {

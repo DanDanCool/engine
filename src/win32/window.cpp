@@ -51,6 +51,7 @@ namespace jolly {
 	}
 
 	u32 window::create(cref<core::string> name, core::pair<u32, u32> sz) {
+		core::lock l(lock);
 		u32 id = windows.size;
 
 		core::string_base<i16> wname = name.cast<i16>();
@@ -110,6 +111,7 @@ namespace jolly {
 
 	void window::callback(u32 id, win_event event) {
 		if (!callbacks.has(event)) return;
+		core::lock l(lock);
 		for (auto cb : callbacks[event]) {
 			cb(*this, id, event);
 		}

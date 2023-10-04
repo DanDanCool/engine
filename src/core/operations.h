@@ -18,6 +18,11 @@ namespace core {
 		}
 
 	template <typename T>
+		T abs(cref<T> a) {
+			return a < 0 ? -a : a;
+		}
+
+	template <typename T>
 		cref<T> min(cref<T> a, cref<T> b) {
 			bool val = a < b;
 			return val ? a : b;

@@ -13,17 +13,7 @@ namespace core {
 		string_base() = default;
 		string_base(const type* str)
 		: data(nullptr), size(0) {
-			u64 count = 0;
-			while (str[count]) {
-				count++;
-			}
-
-			u32 bytes = (u32)((count + 1) * sizeof(type));
-			memptr ptr = alloc256(bytes);
-			copy8((u8*)str, ptr.data, bytes);
-
-			data = (type*)ptr.data;
-			size = count;
+			*this = str;
 		}
 
 		string_base(type* str, u64 size)
@@ -59,6 +49,21 @@ namespace core {
 
 			other.data = nullptr;
 			other.size = 0;
+			return *this;
+		}
+
+		ref<string_base> operator=(const type* str) {
+			u64 count = 0;
+			while (str[count]) {
+				count++;
+			}
+
+			u32 bytes = (u32)((count + 1) * sizeof(type));
+			memptr ptr = alloc256(bytes);
+			copy8((u8*)str, ptr.data, bytes);
+
+			data = (type*)ptr.data;
+			size = count;
 			return *this;
 		}
 

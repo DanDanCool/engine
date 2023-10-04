@@ -122,6 +122,9 @@ void test_ptr() {
 
 void test_log() {
 	std::cout << DIVIDE << "log" << std::endl;
+	auto fmt = format_string("% % %", 5, 4, "hello");
+	LOG_INFO(fmt.data);
+	LOG_INFO("test test % % %", 420, -69, "hello");
 	LOG_INFO("this is info");
 	LOG_WARN("this is a warning");
 	LOG_CRIT("this is a critical error");
