@@ -20,10 +20,11 @@ namespace jolly {
 	: _window(),
 	_instance(VK_NULL_HANDLE),
 	_debugmsg(VK_NULL_HANDLE),
-	_devices(0),
-	_main_gpu(U32_MAX) {
+	_gpus(0),
+	_gpu(U32_MAX) {
 		_window = core::ptr_create<window>(name, sz);
 
+		// enable validation layers
 		core::vector<cstr> enabled_layers = {
 			"VK_LAYER_KHRONOS_validation"
 		};
@@ -54,6 +55,7 @@ namespace jolly {
 		app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 		app_info.apiVersion = VK_API_VERSION_1_0;
 
+		// enable extensions
 		count = 0;
 		vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr);
 		core::vector<VkExtensionProperties> extensions(count);
@@ -75,6 +77,7 @@ namespace jolly {
 		msg_info.pfnUserCallback = vkdebugcb;
 		msg_info.pUserData = nullptr;
 
+		// create instance
 		VkInstanceCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		info.pApplicationInfo = &app_info;
@@ -84,15 +87,15 @@ namespace jolly {
 		info.ppEnabledLayerNames = enabled_layers.data;
 		info.pNext = &msg_info;
 
-		enabled_extensions.data = nullptr;
-		enabled_layers.data = nullptr;
 		vkCreateInstance(&info, nullptr, &_instance);
 
+		// create debug messenger
 		auto fn = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT");
 		fn(_instance, &msg_info, nullptr, &_debugmsg);
 
-		_window->vkinit(_instance);
+		_window->vkinit(*this);
 
+		// create gpus
 		count = 0;
 		vkEnumeratePhysicalDevices(_instance, &count, nullptr);
 		core::vector<VkPhysicalDevice> devices(count);
@@ -106,6 +109,7 @@ namespace jolly {
 			VkPhysicalDeviceFeatures features{};
 			vkGetPhysicalDeviceFeatures(gpu.physical, &features);
 
+			// queue info
 			u32 count = 0;
 			vkGetPhysicalDeviceQueueFamilyProperties(gpu.physical, &count, nullptr);
 			core::vector<VkQueueFamilyProperties> queues(count);
@@ -141,40 +145,87 @@ namespace jolly {
 				info.pQueuePriorities = &priority;
 			}
 
+			// check for extensions
+			core::vector<cstr> extensions = {
+				VK_KHR_SWAPCHAIN_EXTENSION_NAME
+			};
+
+			count = 0;
+			vkEnumerateDeviceExtensionProperties(gpu.physical, nullptr, &count, nullptr);
+			core::vector<VkExtensionProperties> available(count);
+			vkEnumerateDeviceExtensionProperties(gpu.physical, nullptr, &count, available.data);
+			available.size = count;
+
+			bool all_extensions = true;
+			for (cstr name : extensions) {
+				bool found = false;
+				for (auto& extension : available) {
+					if (core::cmpeq(name, extension.extensionName)) {
+						found = true;
+						break;
+					}
+				}
+
+				all_extensions &= found;
+				if (!all_extensions) break;
+			}
+
+			// check swapchain support
+			bool swapchain = true;
+			count = 0;
+			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, surface, &count, nullptr);
+			swapchain = swapchain && count != 0;
+			count = 0;
+			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, surface, &count, nullptr);
+			swapchain = swapchain && count != 0;
+
+			// create logical device
 			VkPhysicalDeviceFeatures enabled{};
 			VkDeviceCreateInfo info{};
 			info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 			info.pQueueCreateInfos = queue_info.data;
 			info.queueCreateInfoCount = queue_info.size;
 			info.pEnabledFeatures = &enabled;
+			if (all_extensions) {
+				info.ppEnabledExtensionNames = extensions.data;
+				info.enabledExtensionCount = extensions.size;
+			}
 			vkCreateDevice(gpu.physical, &info, nullptr, &gpu.device);
 
 			if (graphics != U32_MAX) {
-				vkGetDeviceQueue(gpu.device, graphics, 0, &gpu.graphics);
-				vkGetDeviceQueue(gpu.device, present, 0, &gpu.present);
+				vkGetDeviceQueue(gpu.device, graphics, 0, &gpu.graphics.queue);
+				gpu.graphics.family = graphics;
 			}
 
+			if (present != U32_MAX) {
+				vkGetDeviceQueue(gpu.device, present, 0, &gpu.present.queue);
+				gpu.present.family = present;
+			}
+
+			// decide if this device is suitable
 			bool all_queues = graphics != U32_MAX && present != U32_MAX;
-			return props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && all_queues;
+			bool discrete = props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+			return discrete && all_queues && all_extensions && swapchain;
 		};
 
-		VkSurfaceKHR surface = _window->surface->surfaces._vals[0];
+		VkSurfaceKHR surface = _window->vksurface();
 		for (auto device : devices) {
-			ref<vk_gpu> gpu = _devices.add();
+			ref<vk_gpu> gpu = _gpus.add();
 			gpu.physical = device;
-			if (device_suitable(gpu, surface) && _main_gpu == U32_MAX) {
-				_main_gpu = _devices.size - 1;
+			if (device_suitable(gpu, surface) && _gpu == U32_MAX) {
+				_gpu = _gpus.size - 1;
 			}
 		}
 
-		assert(_main_gpu != U32_MAX);
+		assert(_gpu != U32_MAX);
 
+		_window->vkswapchain();
 	}
 
 	vk_device::~vk_device() {
-		_window->vkterm(_instance);
+		_window->vkterm();
 
-		for (auto& gpu : _devices) {
+		for (auto& gpu : _gpus) {
 			vkDestroyDevice(gpu.device, nullptr);
 		}
 

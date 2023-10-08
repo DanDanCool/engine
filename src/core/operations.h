@@ -42,6 +42,14 @@ namespace core {
 		}
 
 	template <typename T>
+		T clamp(T a, T min, T max) {
+			T tmp = a;
+			tmp = tmp < min ? min : tmp;
+			tmp = tmp > max ? max : tmp;
+			return tmp;
+		}
+
+	template <typename T>
 		struct hash_info {
 			static u32 hash(cref<T> key) {
 				return fnv1a(bytes(key), sizeof(T));

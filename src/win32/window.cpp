@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <winuser.h>
 
+#include <render/vk_device.h>
 #include <render/vk_surface.h>
 #include <vulkan/vulkan.h>
 
@@ -99,6 +100,7 @@ namespace jolly {
 		UpdateWindow(win);
 
 		windows[id] = core::ptr<void>((void*)win);
+		callback(id, win_event::create);
 		return id;
 	}
 
@@ -116,28 +118,172 @@ namespace jolly {
 		}
 	}
 
-	void window::vkinit(VkInstance instance) {
-		surface = core::ptr_create<vk_surface>();
-		auto& surf = surface.ref();
-		for (auto& [i, hwnd] : windows) {
+	void window::vkinit(cref<vk_device> device) {
+		surface = core::ptr_create<vk_surface>(device);
+
+		auto createcb = [](ref<window> state, u32 id, win_event event) {
+			ref<vk_surface> surface = state.surface.ref();
+
 			VkSurfaceKHR tmp = VK_NULL_HANDLE;
 			VkWin32SurfaceCreateInfoKHR info{};
 			info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-			info.hwnd = (HWND)hwnd.data;
-			info.hinstance = (HINSTANCE)handle.data;
-			vkCreateWin32SurfaceKHR(instance, &info, nullptr, &tmp);
-			surf.surfaces[i] = tmp;
+			info.hwnd = (HWND)state.windows[id].data;
+			info.hinstance = (HINSTANCE)state.handle.data;
+
+			vkCreateWin32SurfaceKHR(surface.device._instance, &info, nullptr, &tmp);
+			surface.surfaces[id] = vk_swapchain{};
+			surface.surfaces[id].surface = tmp;
+		};
+
+		auto closecb = [](ref<window> state, u32 id, win_event event) {
+			ref<vk_surface> surface = state.surface.ref();
+			auto& gpu = surface.device._gpus[surface.device._gpu];
+			ref<vk_swapchain> swapchain = surface.surfaces[id];
+
+			for (auto view : swapchain.views) {
+				vkDestroyImageView(gpu.device, view, nullptr);
+			}
+
+			vkDestroySwapchainKHR(gpu.device, swapchain.swapchain, nullptr);
+			vkDestroySurfaceKHR(surface.device._instance, swapchain.surface, nullptr);
+
+			surface.surfaces.del(id);
+		};
+
+		for (u32 i : windows.keys()) {
+			createcb(*this, i, win_event::create);
+		}
+
+		addcb(win_event::create, createcb);
+		addcb(win_event::close, closecb);
+	}
+
+	void window::vkterm() {
+		auto& _surface = surface.ref();
+		for (auto surf: _surface.surfaces.vals()) {
+			vkDestroySurfaceKHR(_surface.device._instance, surf.surface, nullptr);
 		}
 	}
 
-	void window::vkterm(VkInstance instance) {
-		auto& surf = surface.ref();
-		for (auto surfkhr : surf.surfaces.vals()) {
-			vkDestroySurfaceKHR(instance, surfkhr, nullptr);
+	void window::vkswapchain() {
+		auto createcb = [](ref<window> state, u32 id, win_event event) {
+			auto& surface = state.surface.ref();
+			auto& gpu = surface.device._gpus[surface.device._gpu];
+			auto& surf = surface.surfaces[id];
+
+			VkSurfaceCapabilitiesKHR capabilities{};
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu.physical, surf.surface, &capabilities);
+
+			u32 count = 0;
+			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, surf.surface, &count, nullptr);
+			core::vector<VkSurfaceFormatKHR> surface_formats(count);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, surf.surface, &count, surface_formats.data);
+			surface_formats.size = count;
+
+			count = 0;
+			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, surf.surface, &count, nullptr);
+			core::vector<VkPresentModeKHR> present_modes(count);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, surf.surface, &count, nullptr);
+			present_modes.size = count;
+
+			VkSurfaceFormatKHR format = surface_formats[0];
+			for (auto& available: surface_formats) {
+				if (available.format == VK_FORMAT_B8G8R8A8_SRGB && available.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+					format = available;
+					break;
+				}
+			}
+
+			if (surface.format == VK_FORMAT_UNDEFINED)
+				surface.format = format.format;
+			assert(surface.format == format.format);
+
+			VkPresentModeKHR present = VK_PRESENT_MODE_FIFO_KHR;
+			for (auto& available: present_modes) {
+				if (available == VK_PRESENT_MODE_MAILBOX_KHR) {
+					present = available;
+					break;
+				}
+			}
+
+			auto [x, y] = state.fbsize(id);
+			x = core::clamp(x, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+			y = core::clamp(y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+
+			surf.extent = VkExtent2D{x, y};
+
+			u32 max_count = capabilities.maxImageCount ? capabilities.maxImageCount : U32_MAX;
+			u32 image_count = min(capabilities.minImageCount + 1, max_count);
+
+			VkSwapchainCreateInfoKHR info{};
+			info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+			info.surface = surf.surface;
+			info.minImageCount = image_count;
+			info.imageFormat = format.format;
+			info.imageColorSpace = format.colorSpace;
+			info.imageExtent = surf.extent;
+			info.imageArrayLayers = 1;
+			info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+			core::vector<u32> indices = { gpu.graphics.family, gpu.present.family };
+			if (gpu.present.family != gpu.graphics.family) {
+				info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+				info.queueFamilyIndexCount = 2;
+				info.pQueueFamilyIndices = indices.data;
+			} else {
+				info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			}
+
+			info.preTransform = capabilities.currentTransform;
+			info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+			info.presentMode = present;
+			info.clipped = VK_TRUE;
+			info.oldSwapchain = VK_NULL_HANDLE;
+
+			vkCreateSwapchainKHR(gpu.device, &info, nullptr, &surf.swapchain);
+
+			vkGetSwapchainImagesKHR(gpu.device, surf.swapchain, &image_count, nullptr);
+			surf.images = core::vector<VkImage>(image_count);
+			vkGetSwapchainImagesKHR(gpu.device, surf.swapchain, &image_count, surf.images.data);
+			surf.images.size = image_count;
+
+			surf.views = core::vector<VkImageView>(image_count);
+			for (u32 i : core::range(image_count)) {
+				VkImageViewCreateInfo info{};
+				info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+				info.image = surf.images[i];
+				info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+				info.format = surface.format;
+				info.components = VkComponentMapping{
+					VK_COMPONENT_SWIZZLE_IDENTITY,
+					VK_COMPONENT_SWIZZLE_IDENTITY,
+					VK_COMPONENT_SWIZZLE_IDENTITY,
+					VK_COMPONENT_SWIZZLE_IDENTITY
+				};
+				info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				info.subresourceRange.baseMipLevel = 0;
+				info.subresourceRange.levelCount = 1;
+				info.subresourceRange.baseArrayLayer = 0;
+				info.subresourceRange.layerCount = 1;
+
+				auto& view = surf.views.add();
+				vkCreateImageView(gpu.device, &info, nullptr, &view);
+			}
+		};
+
+		for (u32 id : windows.keys()) {
+			createcb(*this, id, win_event::create);
 		}
+
+		addcb(win_event::create, createcb);
 	}
 
-	core::vector<cstr> window::vkextensions(cref<core::vector<VkExtensionProperties>> extensions) {
+	VkSurfaceKHR window::vksurface() const {
+		auto& _surface = surface.ref();
+		return _surface.surfaces._vals[0].surface;
+	}
+
+	core::vector<cstr> window::vkextensions(cref<core::vector<VkExtensionProperties>> extensions) const {
 		bool surface = false, win32_surface = false;
 		for (auto& extension : extensions) {
 			if (core::cmpeq(extension.extensionName, "VK_KHR_surface")) {
@@ -162,12 +308,18 @@ namespace jolly {
 		return true;
 	}
 
-	void window::size(core::pair<u32, u32> sz) {
+	void window::size(u32 id, core::pair<u32, u32> sz) {
 
 	}
 
-	core::pair<u32, u32> window::size() const {
-		return core::pair<u32, u32>(0, 0);
+	core::pair<u32, u32> window::size(u32 id) const {
+		RECT area{};
+		GetClientRect((HWND)windows[id].data, &area);
+		return core::pair<u32, u32>(area.right, area.bottom);
+	}
+
+	core::pair<u32, u32> window::fbsize(u32 id) const {
+		return size(id);
 	}
 
 	void window::callback(u32 id, win_event event) {
@@ -179,7 +331,12 @@ namespace jolly {
 	}
 
 	void window::addcb(win_event event, pfn_win_cb cb) {
-		callbacks[event].add(cb);
+		auto& vec = callbacks[event];
+		if (!vec.data) {
+			vec = core::vector<pfn_win_cb>(0);
+		}
+
+		vec.add(cb);
 	}
 
 	static void windestroycb(ref<window> state, u32 id, win_event event) {

@@ -9,11 +9,17 @@
 
 namespace jolly {
 	struct window;
+
+	struct vk_queue {
+		VkQueue queue;
+		u32 family;
+	};
+
 	struct vk_gpu {
 		VkPhysicalDevice physical;
 		VkDevice device;
-		VkQueue graphics;
-		VkQueue present;
+		vk_queue graphics;
+		vk_queue present;
 	};
 
 	struct vk_device {
@@ -27,7 +33,7 @@ namespace jolly {
 		VkInstance _instance;
 		VkDebugUtilsMessengerEXT _debugmsg;
 
-		core::vector<vk_gpu> _devices;
-		u32 _main_gpu; // gpu we use to present and render
+		core::vector<vk_gpu> _gpus;
+		u32 _gpu; // gpu we use to present and render
 	};
 }
