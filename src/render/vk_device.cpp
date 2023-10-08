@@ -1,6 +1,8 @@
 #include "vk_device.h"
+#include "vk_surface.h"
 
 #include <core/log.h>
+#include <core/set.h>
 #include <win32/window.h>
 
 namespace jolly {
@@ -15,7 +17,11 @@ namespace jolly {
 	}
 
 	vk_device::vk_device(cref<core::string> name, core::pair<u32, u32> sz)
-	: _window(), _instance(), _debugmsg() {
+	: _window(),
+	_instance(VK_NULL_HANDLE),
+	_debugmsg(VK_NULL_HANDLE),
+	_devices(0),
+	_main_gpu(U32_MAX) {
 		_window = core::ptr_create<window>(name, sz);
 
 		core::vector<cstr> enabled_layers = {
@@ -84,9 +90,94 @@ namespace jolly {
 
 		auto fn = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT");
 		fn(_instance, &msg_info, nullptr, &_debugmsg);
+
+		_window->vkinit(_instance);
+
+		count = 0;
+		vkEnumeratePhysicalDevices(_instance, &count, nullptr);
+		core::vector<VkPhysicalDevice> devices(count);
+		vkEnumeratePhysicalDevices(_instance, &count, devices.data);
+		devices.size = count;
+
+		auto device_suitable = [](ref<vk_gpu> gpu, VkSurfaceKHR surface) {
+			VkPhysicalDeviceProperties props{};
+			vkGetPhysicalDeviceProperties(gpu.physical, &props);
+
+			VkPhysicalDeviceFeatures features{};
+			vkGetPhysicalDeviceFeatures(gpu.physical, &features);
+
+			u32 count = 0;
+			vkGetPhysicalDeviceQueueFamilyProperties(gpu.physical, &count, nullptr);
+			core::vector<VkQueueFamilyProperties> queues(count);
+			vkGetPhysicalDeviceQueueFamilyProperties(gpu.physical, &count, queues.data);
+			queues.size = count;
+
+			u32 graphics = U32_MAX;
+			u32 present = U32_MAX;
+
+			for (int i : core::range(queues.size)) {
+				auto& queue = queues[i];
+
+				VkBool32 present_support = false;
+				vkGetPhysicalDeviceSurfaceSupportKHR(gpu.physical, i, surface, &present_support);
+				if (present_support) {
+					present = i;
+				}
+
+				if (queue.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+					graphics = i;
+				}
+			}
+
+			core::set<u32> indices = { graphics, present };
+			core::vector<VkDeviceQueueCreateInfo> queue_info(indices.size);
+			for (u32 i : indices) {
+				if (i == U32_MAX) continue;
+				float priority = 1;
+				auto& info = queue_info.add();
+				info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+				info.queueFamilyIndex = i;
+				info.queueCount = 1;
+				info.pQueuePriorities = &priority;
+			}
+
+			VkPhysicalDeviceFeatures enabled{};
+			VkDeviceCreateInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+			info.pQueueCreateInfos = queue_info.data;
+			info.queueCreateInfoCount = queue_info.size;
+			info.pEnabledFeatures = &enabled;
+			vkCreateDevice(gpu.physical, &info, nullptr, &gpu.device);
+
+			if (graphics != U32_MAX) {
+				vkGetDeviceQueue(gpu.device, graphics, 0, &gpu.graphics);
+				vkGetDeviceQueue(gpu.device, present, 0, &gpu.present);
+			}
+
+			bool all_queues = graphics != U32_MAX && present != U32_MAX;
+			return props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && all_queues;
+		};
+
+		VkSurfaceKHR surface = _window->surface->surfaces._vals[0];
+		for (auto device : devices) {
+			ref<vk_gpu> gpu = _devices.add();
+			gpu.physical = device;
+			if (device_suitable(gpu, surface) && _main_gpu == U32_MAX) {
+				_main_gpu = _devices.size - 1;
+			}
+		}
+
+		assert(_main_gpu != U32_MAX);
+
 	}
 
 	vk_device::~vk_device() {
+		_window->vkterm(_instance);
+
+		for (auto& gpu : _devices) {
+			vkDestroyDevice(gpu.device, nullptr);
+		}
+
 		auto fn = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT");
 		fn(_instance, _debugmsg, nullptr);
 		vkDestroyInstance(_instance, nullptr);

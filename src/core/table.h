@@ -4,7 +4,7 @@
 #include "vector.h"
 
 namespace core {
-	const u32 TABLE_PROBE = 24;
+	constexpr u32 TABLE_PROBE = 24;
 
 	u32 table_size(u32 sz);
 
@@ -68,7 +68,6 @@ namespace core {
 				u32 dist = (cur % reserve) - i;
 				if (dist < probe) {
 					_dense[dense] = i;
-
 					swap(_hash[i], hash);
 					swap(_keys[i], key);
 					swap(_sparse[i], dense);

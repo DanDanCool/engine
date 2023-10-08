@@ -4,7 +4,7 @@
 #include <core/table.h>
 #include <core/thread.h>
 #include <core/log.h>
-#include <iostream>
+#include <core/set.h>
 
 using namespace core;
 
@@ -13,7 +13,7 @@ const cstr DIVIDE = "----------------";
 struct foostruct {
 	foostruct(cref<int> in) : data(in) {}
 	~foostruct() {
-		std::cout << "foostruct destructor " << data << std::endl;
+		LOG_INFO("foostruct destructor %", data);
 	}
 	int data;
 };
@@ -24,24 +24,25 @@ struct basicstruct {
 };
 
 void test_thread() {
-	std::cout << DIVIDE << "thread" << std::endl;
+	LOG_INFO("% thread", DIVIDE);
 	ptr<basicstruct> myptr = ptr_create<basicstruct>(1, 2, 3, 4);
 
 	auto coroutine = [](ref<thread>, ptr<void> in) -> int {
 		ptr<int> args = in.cast<int>();
 
 		for (int x : range(args.ref())) {
-			std::cout << x << std::endl;
+			LOG_INFO("%", x);
 		}
 
 		return 0;
 	};
 
 	thread mythread = thread(coroutine, ptr_create<int>(5).cast<void>());
+	LOG_INFO("thread joined");
 }
 
 void test_vector() {
-	std::cout << DIVIDE << "vector" << std::endl;
+	LOG_INFO("% vector", DIVIDE);
 	vector<int> v(0);
 
 	int a = {};
@@ -56,20 +57,20 @@ void test_vector() {
 	}
 
 	for (auto x : reverse(scopedv)) {
-		std::cout << x.data << std::endl;
+		LOG_INFO("%", x.data);
 	}
 }
 
 void test_string() {
-	std::cout << DIVIDE << "string" << std::endl;
+	LOG_INFO("% string", DIVIDE);
 	string s("hello world!");
 	for (auto x : forward(s)) {
-		std::cout << x << std::endl;
+		LOG_INFO("%", x);
 	}
 }
 
 void test_table() {
-	std::cout << DIVIDE << "table" << std::endl;
+	LOG_INFO("% table", DIVIDE);
 	table<i32, i32> mytable;
 	for (i32 x : range(128)) {
 		mytable[x] = x;
@@ -77,7 +78,7 @@ void test_table() {
 
 	i64 sum = 0;
 	for (i32 x : range(128)) {
-		std::cout << x << " " << mytable[x] << std::endl;
+		LOG_INFO("% %", x, mytable[x]);
 	}
 
 	table<string, i32> words;
@@ -91,19 +92,18 @@ void test_table() {
 	words.del("lazy");
 
 	for (auto& [key, val] : words) {
-		std::cout << key << " " << val << std::endl;
+		LOG_INFO("% %", key, val);
 	}
 }
 
 void test_ptr() {
-	std::cout << DIVIDE << "ptr" << std::endl;
+	LOG_INFO("% ptr", DIVIDE);
 	ptr<string> scope = ptr_create<string>("hello world");
 	ptr<int> a = ptr_create<int>(4);
-	std::cout << scope->data << std::endl;
-	std::cout << a.ref() << std::endl;
+	LOG_INFO("%, %", scope->data, a.ref());
 
 	auto mylambda = [](ptr<int> in) {
-		std::cout << in.ref() << std::endl;
+		LOG_INFO("%", in.ref());
 	};
 
 	ptr<int> foo = ptr_create<int>(69);
@@ -116,18 +116,41 @@ void test_ptr() {
 	}
 
 	for (cref<ptr<int>> p : reverse(indirect)) {
-		std::cout << p.ref() << std::endl;
+		LOG_INFO("%", p.ref());
 	}
 }
 
 void test_log() {
-	std::cout << DIVIDE << "log" << std::endl;
+	LOG_INFO("% log", DIVIDE);
 	auto fmt = format_string("% % %", 5, 4, "hello");
 	LOG_INFO(fmt.data);
 	LOG_INFO("test test % % %", 420, -69, "hello");
 	LOG_INFO("this is info");
 	LOG_WARN("this is a warning");
 	LOG_CRIT("this is a critical error");
+}
+
+void test_set() {
+	LOG_INFO("% set", DIVIDE);
+
+	set<int> smallset = { 2, 4, 6, 8, 2 };
+	for (int x : smallset) {
+		LOG_INFO("smallset %", x);
+	}
+
+	set<int> myset;
+	for (int i : range(100))
+		myset.add(i);
+
+	LOG_INFO("%: %", 0, myset.has(0));
+	myset.add(0);
+
+	for (int i : range(10, 40))
+		myset.del(i);
+
+	for (int x : myset) {
+		LOG_INFO("%", x);
+	}
 }
 
 int main() {
@@ -137,4 +160,5 @@ int main() {
 	test_table();
 	test_ptr();
 	test_log();
+	test_set();
 }

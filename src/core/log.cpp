@@ -96,7 +96,17 @@ namespace core {
 	}
 
 	template<>
+	void format<i8*>(cref<i8*> arg, ref<fmtbuf> buf) {
+		format<cstr>((cstr)arg, buf);
+	}
+
+	template<>
 	void format<i64>(cref<i64> arg, ref<fmtbuf> buf) {
+		if (arg == 0) {
+			buf.write('0');
+			return;
+		}
+
 		array<i8, 20> data;
 
 		i64 tmp = abs(arg);
@@ -117,6 +127,15 @@ namespace core {
 			i--;
 			if (buf.index >= fmtbuf::size) return;
 			buf.write((u8)data[i]);
+		}
+	}
+
+	template<>
+	void format<bool>(cref<bool> arg, ref<fmtbuf> buf) {
+		if (arg) {
+			format("true", buf);
+		} else {
+			format("false", buf);
 		}
 	}
 

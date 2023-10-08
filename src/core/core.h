@@ -98,3 +98,15 @@ u8* bytes(cref<T> val) {
 		i64 res = (i64)a & (i64)b; \
 		return (enum)res; \
 	} \
+
+#define elif else if
+
+#ifdef JOLLY_WIN32
+#ifdef JOLLY_EXPORT
+#define JOLLY_API __declspec(dllexport)
+#else
+#define JOLLY_API __declspec(dllimport)
+#endif
+#else
+#define JOLLY_API
+#endif

@@ -6,7 +6,28 @@
 #include <windows.h>
 #include <winuser.h>
 
+#include <render/vk_surface.h>
 #include <vulkan/vulkan.h>
+
+typedef VkFlags VkWin32SurfaceCreateFlagsKHR;
+struct VkWin32SurfaceCreateInfoKHR {
+    VkStructureType                 sType;
+    const void*                     pNext;
+    VkWin32SurfaceCreateFlagsKHR    flags;
+    HINSTANCE                       hinstance;
+    HWND                            hwnd;
+};
+
+typedef VkResult (APIENTRY *PFN_vkCreateWin32SurfaceKHR)(VkInstance,const VkWin32SurfaceCreateInfoKHR*,const VkAllocationCallbacks*,VkSurfaceKHR*);
+static VkResult vkCreateWin32SurfaceKHR(
+		VkInstance instance,
+		const VkWin32SurfaceCreateInfoKHR* info,
+		const VkAllocationCallbacks* callbacks,
+		VkSurfaceKHR* surface) {
+	auto fn = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
+	assert(fn);
+	return fn(instance, info, callbacks, surface);
+}
 
 namespace jolly {
 	const auto* WNDCLASS_NAME = L"JOLLY_WNDCLASS";
@@ -15,7 +36,7 @@ namespace jolly {
 	static LRESULT wndproc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam);
 
 	window::window(cref<core::string> name, core::pair<u32, u32> sz)
-	: handle(), windows(), callbacks(), lock() {
+	: handle(), surface(), windows(), callbacks(), lock() {
 		handle = (void*)GetModuleHandle(NULL);
 
 		WNDCLASSEXW info = {};
@@ -92,6 +113,27 @@ namespace jolly {
 
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
+		}
+	}
+
+	void window::vkinit(VkInstance instance) {
+		surface = core::ptr_create<vk_surface>();
+		auto& surf = surface.ref();
+		for (auto& [i, hwnd] : windows) {
+			VkSurfaceKHR tmp = VK_NULL_HANDLE;
+			VkWin32SurfaceCreateInfoKHR info{};
+			info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+			info.hwnd = (HWND)hwnd.data;
+			info.hinstance = (HINSTANCE)handle.data;
+			vkCreateWin32SurfaceKHR(instance, &info, nullptr, &tmp);
+			surf.surfaces[i] = tmp;
+		}
+	}
+
+	void window::vkterm(VkInstance instance) {
+		auto& surf = surface.ref();
+		for (auto surfkhr : surf.surfaces.vals()) {
+			vkDestroySurfaceKHR(instance, surfkhr, nullptr);
 		}
 	}
 
