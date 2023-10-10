@@ -20,7 +20,10 @@ namespace core {
 
 	struct mutex {
 		mutex();
+		mutex(mutex&& other);
 		~mutex();
+
+		ref<mutex> operator=(mutex&& other);
 
 		bool tryacquire();
 		void acquire();
@@ -31,7 +34,10 @@ namespace core {
 
 	struct semaphore {
 		semaphore(u32 max = 1, u32 count = 0);
+		semaphore(semaphore&& other);
 		~semaphore();
+
+		ref<semaphore> operator=(semaphore&& other);
 
 		bool tryacquire();
 		void acquire();

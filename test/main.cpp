@@ -3,6 +3,7 @@
 #include <core/string.h>
 #include <core/table.h>
 #include <core/thread.h>
+#include <core/lock.h>
 #include <core/log.h>
 #include <core/set.h>
 
@@ -153,6 +154,34 @@ void test_set() {
 	}
 }
 
+ void test_mutex() {
+	LOG_INFO("% mutex", DIVIDE);
+
+	{
+		// win32 behaviour: should return true twice
+		LOG_INFO("test mutex");
+		mutex lock;
+		bool acquired = lock.tryacquire();
+		LOG_INFO("%", acquired);
+		acquired = lock.tryacquire();
+		LOG_INFO("%", acquired);
+
+		lock.release();
+	}
+
+	{
+		// win32 behaviour: return true than false
+		LOG_INFO("test semaphore");
+		semaphore lock(1, 1);
+		bool acquired = lock.tryacquire();
+		LOG_INFO("%", acquired);
+		acquired = lock.tryacquire();
+		LOG_INFO("%", acquired);
+
+		lock.release();
+	}
+ }
+
 int main() {
 	test_thread();
 	test_vector();
@@ -161,4 +190,5 @@ int main() {
 	test_ptr();
 	test_log();
 	test_set();
+	test_mutex();
 }

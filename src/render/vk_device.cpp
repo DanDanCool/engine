@@ -433,36 +433,11 @@ namespace jolly {
 
 		vkCreateGraphicsPipelines(gpu.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_pipeline.pipeline);
 
-		auto createframebufferscb = [](ref<window> state, u32 id, win_event event) {
-			auto& surface = state.surface.ref();
-			auto& swapchain = surface.surfaces[id];
-			auto& gpu = surface.device.main_gpu();
-			swapchain.framebuffers = core::vector<VkFramebuffer>(swapchain.views.size);
-			for (i32 i : core::range(swapchain.views.size)) {
-				VkImageView attachments[] = {
-					swapchain.views[i]
-				};
-
-				VkFramebufferCreateInfo info{};
-				info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-				info.renderPass = surface.device._pipeline.renderpass;
-				info.attachmentCount = 1;
-				info.pAttachments = attachments;
-				info.width = swapchain.extent.width;
-				info.height = swapchain.extent.height;
-				info.layers = 1;
-
-				VkFramebuffer fb = VK_NULL_HANDLE;
-				vkCreateFramebuffer(gpu.device, &info, nullptr, &fb);
-				swapchain.framebuffers.add(fb);
-			}
-		};
-
 		for (u32 id : _window->windows.keys()) {
-			createframebufferscb(_window.ref(), id, win_event::create);
+			vk_framebuffer_create_cb(_window.ref(), id, win_event::create);
 		}
 
-		_window->addcb(win_event::create, createframebufferscb);
+		_window->add_cb(win_event::create, vk_framebuffer_create_cb);
 
 		vkDestroyShaderModule(gpu.device, vmodule, nullptr);
 		vkDestroyShaderModule(gpu.device, fmodule, nullptr);
@@ -477,8 +452,10 @@ namespace jolly {
 
 		auto& gpu = main_gpu();
 		auto& surface = _window->surface.ref();
-		vkWaitForFences(gpu.device, 1, &surface.fence[_frame], VK_TRUE, U64_MAX);
-		vkResetFences(gpu.device, 1, &surface.fence[_frame]);
+
+		vkWaitForFences(gpu.device, 1, &surface.fences[_frame], VK_TRUE, U64_MAX);
+
+		_cmdpool.gc(gpu);
 
 		core::vector<VkCommandBuffer> cmdbufs(0);
 		core::vector<VkSemaphore> wait_semaphores(0);
@@ -487,6 +464,11 @@ namespace jolly {
 		core::vector<VkSwapchainKHR> swapchains(0);
 		core::vector<u32> image_indices(0);
 		for (u32 i : _window->windows.keys()) {
+			auto& swapchain = surface.surfaces[i];
+			if (!swapchain.busy.tryacquire()) {
+				continue;
+			}
+
 			VkCommandBuffer cmdbuf = _cmdpool.create(gpu);
 			vkResetCommandBuffer(cmdbuf, 0);
 
@@ -496,7 +478,6 @@ namespace jolly {
 			begin_info.pInheritanceInfo = nullptr;
 			vkBeginCommandBuffer(cmdbuf, &begin_info);
 
-			auto& swapchain = surface.surfaces[i];
 			u32 image_index = U32_MAX;
 			vkAcquireNextImageKHR(gpu.device, swapchain.swapchain, U64_MAX, swapchain.image_available[_frame], VK_NULL_HANDLE, &image_index);
 			VkRenderPassBeginInfo renderpass_info{};
@@ -538,8 +519,11 @@ namespace jolly {
 			swapchains.add(swapchain.swapchain);
 			image_indices.add(image_index);
 
-			_cmdpool.destroy(cmdbuf, surface.fence[_frame]);
+			_cmdpool.destroy(cmdbuf, surface.fences[_frame]);
+			swapchain.busy.release();
 		}
+
+		if (!swapchains.size) return;
 
 		VkSubmitInfo submit_info{};
 		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -551,7 +535,8 @@ namespace jolly {
 		submit_info.signalSemaphoreCount = signal_semaphores.size;
 		submit_info.pSignalSemaphores = signal_semaphores.data;
 
-		vkQueueSubmit(gpu.graphics.queue, 1, &submit_info, surface.fence[_frame]);
+		vkResetFences(gpu.device, 1, &surface.fences[_frame]);
+		vkQueueSubmit(gpu.graphics.queue, 1, &submit_info, surface.fences[_frame]);
 
 		VkPresentInfoKHR present_info{};
 		present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -562,8 +547,7 @@ namespace jolly {
 		present_info.pImageIndices = image_indices.data;
 		present_info.pResults = nullptr;
 
-		if (swapchains.size)
-			vkQueuePresentKHR(gpu.present.queue, &present_info);
+		vkQueuePresentKHR(gpu.present.queue, &present_info);
 
 		_frame = (_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
@@ -584,15 +568,6 @@ namespace jolly {
 	}
 
 	VkCommandBuffer vk_cmdpool::create(cref<vk_gpu> gpu) {
-		for (i32 i : core::range(busy.size, 0, -1)) {
-			i = i - 1;
-			auto [buffer, fence] = busy[i];
-			if (vkGetFenceStatus(gpu.device, fence) == VK_SUCCESS) {
-				free.add(buffer);
-				busy.del(i);
-			}
-		}
-
 		if (free.size == 0) {
 			VkCommandBufferAllocateInfo alloc_info{};
 			alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -608,7 +583,18 @@ namespace jolly {
 		return free[--free.size];
 	}
 
-	void vk_cmdpool::destroy(VkCommandBuffer buf, VkFence fence) {
-		busy.add({buf, fence});
+	void vk_cmdpool::destroy(VkCommandBuffer buffer, VkFence fence) {
+		busy.add({buffer, fence});
+	}
+
+	void vk_cmdpool::gc(cref<vk_gpu> gpu) {
+		for (i32 i : core::range(busy.size, 0, -1)) {
+			i = i - 1;
+			auto [buffer, fence] = busy[i];
+			if (vkGetFenceStatus(gpu.device, fence) == VK_SUCCESS) {
+				free.add(buffer);
+				busy.del(i);
+			}
+		}
 	}
 }

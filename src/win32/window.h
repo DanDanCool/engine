@@ -14,6 +14,7 @@ namespace jolly {
 		close,
 		destroy,
 		create,
+		resize,
 	};
 
 	struct window;
@@ -43,7 +44,7 @@ namespace jolly {
 		bool vsync() const;
 
 		void callback(u32 id, win_event event);
-		void addcb(win_event event, pfn_win_cb cb);
+		void add_cb(win_event event, pfn_win_cb cb);
 
 		void size(u32 id, core::pair<u32, u32> sz);
 		core::pair<u32, u32> size(u32 id) const;
@@ -53,6 +54,10 @@ namespace jolly {
 		core::ptr<vk_surface> surface; // stores rendering device info
 		core::table<u32, core::ptr<void>> windows;
 		core::table<win_event, core::vector<pfn_win_cb>> callbacks;
-		core::mutex lock;
+		core::mutex busy;
 	};
+
+	void vk_swapchain_create_cb(ref<window> state, u32 id, win_event event);
+	void vk_framebuffer_create_cb(ref<window> state, u32 id, win_event event);
+	void vk_swapchain_destroy_cb(ref<window> state, u32 id, win_event event);
 }

@@ -36,7 +36,9 @@ namespace jolly {
 		void destroy(cref<vk_gpu> gpu); // needs explicit destruction
 
 		VkCommandBuffer create(cref<vk_gpu> gpu);
-		void destroy(VkCommandBuffer buf, VkFence fence);
+		void destroy(VkCommandBuffer buffer, VkFence fence);
+
+		void gc(cref<vk_gpu> gpu);
 
 		VkCommandPool pool;
 		core::vector<VkCommandBuffer> free;
