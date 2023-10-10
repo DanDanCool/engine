@@ -50,15 +50,18 @@ namespace core {
 		ptr_base() = default;
 
 		// take ownership
-		ptr_base(cref<ptr_base<type>> other) : data(other.data) {
-			const_cast<ptr_base<type>&>(other) = nullptr;
+		ptr_base(cref<ptr_base<type>> other)
+		: data(nullptr) {
+			*this = other;
 		}
 
-		ptr_base(ptr_base<type>&& other) : data(other.data) {
-			other.data = nullptr;
+		ptr_base(ptr_base<type>&& other)
+		: data(nullptr) {
+			*this = move_data(other);
 		}
 
-		ptr_base(type* in) : data(in) {}
+		ptr_base(type* in)
+		: data(in) {}
 
 		ref<ptr_base<type>> operator=(cref<ptr_base<type>> other) {
 			data = other.data;
@@ -142,16 +145,29 @@ namespace core {
 	template<u32 N>
 	struct buffer_base {
 		static constexpr u32 size = N;
-		buffer_base() : data(), index(0) {
+		buffer_base()
+		: data(), index(0) {
 			data = alloc256(N).data;
 		}
 
-		buffer_base(u8* buf) : data(buf), index(0) {}
+		buffer_base(u8* buf)
+		: data(buf), index(0) {}
+
+		buffer_base(buffer_base&& other)
+		: data(), index(0) {
+			*this = other;
+		}
 
 		~buffer_base() {
 			if (!data) return;
 			free256(data);
 			data = nullptr;
+		}
+
+		ref<buffer_base> operator=(buffer_base&& other) {
+			data = other.data;
+			index = other.index;
+			return *this;
 		}
 
 		u32 write(u8 character) {

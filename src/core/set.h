@@ -1,11 +1,12 @@
 #pragma once
 
-#include "table.h"
 #include "iterator.h"
 
 #include <initializer_list>
 
 namespace core {
+	u32 table_size(u32 sz);
+
 	template <typename T>
 	struct set {
 		using type = T;

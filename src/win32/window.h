@@ -19,6 +19,7 @@ namespace jolly {
 	struct window;
 	struct vk_device;
 	struct vk_surface;
+	struct vk_swapchain;
 	typedef void (*pfn_win_cb)(ref<window> state, u32 id, win_event event);
 
 	struct window {
@@ -32,11 +33,11 @@ namespace jolly {
 
 		void step(f32 ms);
 
-		void vkinit(cref<vk_device> device); // create surfaces
-		void vkterm();
-		void vkswapchain(); // create swapchains
-		VkSurfaceKHR vksurface() const;
-		core::vector<cstr> vkextensions(cref<core::vector<VkExtensionProperties>> extensions) const;
+		void vk_init(cref<vk_device> device); // create surfaces
+		void vk_term();
+		void vk_swapchain_create(); // create swapchains
+		ref<vk_swapchain> vk_main_swapchain() const;
+		core::vector<cstr> vk_extensions(cref<core::vector<VkExtensionProperties>> extensions) const;
 
 		void vsync(bool sync);
 		bool vsync() const;

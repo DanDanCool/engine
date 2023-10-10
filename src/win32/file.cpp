@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <io.h>
+#include <stdio.h>
 
 namespace core {
 	ENUM_CLASS_OPERATORS(access);
@@ -18,11 +19,21 @@ namespace core {
 		handle = (void*)(i64)fd;
 	}
 
+	file::file(file&& other)
+	: handle() {
+		*this = move_data(other);
+	}
+
 	file::~file() {
 		if (!handle) return;
 		int fd = get_fd(handle);
 		_close(fd);
 		handle = nullptr;
+	}
+
+	ref<file> file::operator=(file&& other) {
+		handle = other.handle;
+		return *this;
 	}
 
 	u32 file::write(memptr buf) {
@@ -31,13 +42,18 @@ namespace core {
 		return bytes;
 	}
 
-	buffer file::read() {
+	vector<u8> file::read() {
 		int fd = get_fd(handle);
 
-		buffer buf;
-		int bytes = _read(fd, buf.data, buffer::size);
-		buf.index = bytes;
-		return buf;
+		i32 bytes = (i32)_lseek(fd, 0, SEEK_END);
+		assert(bytes >= 0);
+		vector<u8> buffer(bytes);
+		buffer.size = bytes;
+		bytes = (i32)_lseek(fd, 0, SEEK_SET);
+		assert(bytes >= 0);
+		_read(fd, buffer.data, buffer.size);
+
+		return move_data(buffer);
 	}
 
 	u32 file::read(ref<buffer> buf) {
@@ -54,6 +70,19 @@ namespace core {
 
 	file_buf::file_buf(cref<string> fname, access _access)
 	: file(fname, _access), data() {}
+
+	file_buf::file_buf(file_buf&& other)
+	: file() {
+		*this = move_data(other);
+	}
+
+	ref<file_buf> file_buf::operator=(file_buf&& other) {
+		file::operator=(move_data(other));
+		data.data = other.data.data;
+		data.index = other.data.index;
+
+		return *this;
+	}
 
 	u32 file_buf::write(memptr buf) {
 		u64 bytes = buf.size;
@@ -72,12 +101,12 @@ namespace core {
 		return (u32)bytes;
 	}
 
-	buffer file_buf::read() {
-		return file::read();
-	}
-
 	u32 file_buf::read(ref<buffer> buf){
 		return file::read(buf);
+	}
+
+	vector<u8> file_buf::read() {
+		return move_data(file::read());
 	}
 
 	static int convert_flags(access _access) {

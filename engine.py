@@ -1,4 +1,7 @@
 import jmake
+import argparse
+import subprocess
+from pathlib import Path
 
 workspace = jmake.Workspace("engine")
 
@@ -34,4 +37,20 @@ test.depend(vulkan)
 
 workspace.add(engine)
 workspace.add(test)
-jmake.generate(workspace)
+
+def compileshaders(workspace, args):
+    p = Path('assets/shaders')
+    for shader in p.glob('*'):
+        if shader.suffix not in [ '.vert', '.frag' ]:
+            continue
+        cmd = [ 'glslc', str(shader), '-o', str(p / f"{shader.name}.spv") ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        print(res.stdout)
+        print(res.stderr)
+
+parser = argparse.ArgumentParser()
+subparser = parser.add_subparsers()
+shader_parser = subparser.add_parser('shader')
+shader_parser.set_defaults(func=compileshaders)
+
+jmake.generate(workspace, parser, subparser)

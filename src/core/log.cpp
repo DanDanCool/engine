@@ -9,6 +9,10 @@
 template<> void format<type>(cref<type> arg, ref<fmtbuf> buf) { format<i64>((i64)arg, buf); }
 
 namespace core {
+	file_buf fopen(cref<string> fname, access _access) {
+		return move_data(file_buf(fname, _access));
+	}
+
 	struct sink {
 		sink() = default;
 		virtual ~sink() = default;

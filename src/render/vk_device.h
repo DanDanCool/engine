@@ -8,6 +8,8 @@
 #include <vulkan/vulkan.h>
 
 namespace jolly {
+	constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
+
 	struct window;
 
 	struct vk_queue {
@@ -22,10 +24,33 @@ namespace jolly {
 		vk_queue present;
 	};
 
+	struct vk_pipeline {
+		VkRenderPass renderpass;
+		VkPipelineLayout layout;
+		VkPipeline pipeline;
+	};
+
+	struct vk_cmdpool {
+		vk_cmdpool() = default;
+		vk_cmdpool(cref<vk_gpu> gpu, u32 family);
+		void destroy(cref<vk_gpu> gpu); // needs explicit destruction
+
+		VkCommandBuffer create(cref<vk_gpu> gpu);
+		void destroy(VkCommandBuffer buf, VkFence fence);
+
+		VkCommandPool pool;
+		core::vector<VkCommandBuffer> free;
+		core::vector<core::pair<VkCommandBuffer, VkFence>> busy;
+	};
+
 	struct vk_device {
 		vk_device() = default;
 		vk_device(cref<core::string> name, core::pair<u32, u32> sz = { 1280, 720 });
 		~vk_device();
+
+		void pipeline(cref<core::string> fname);
+
+		ref<vk_gpu> main_gpu() const;
 
 		void step(f32 ms);
 
@@ -33,7 +58,11 @@ namespace jolly {
 		VkInstance _instance;
 		VkDebugUtilsMessengerEXT _debugmsg;
 
+		vk_pipeline _pipeline;
+		vk_cmdpool _cmdpool;
+
 		core::vector<vk_gpu> _gpus;
 		u32 _gpu; // gpu we use to present and render
+		u32 _frame;
 	};
 }

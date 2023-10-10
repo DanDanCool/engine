@@ -3,6 +3,7 @@
 #include "core.h"
 #include "string.h"
 #include "memory.h"
+#include "vector.h"
 
 namespace core {
 	enum class access {
@@ -14,12 +15,16 @@ namespace core {
 	};
 
 	struct file {
+		file() = default;
 		file(cref<string> fname, access _access);
+		file(file&& other);
 		virtual ~file();
 
+		ref<file> operator=(file&& other);
+
 		virtual u32 write(memptr buf);
-		virtual buffer read();
 		virtual u32 read(ref<buffer> buf);
+		virtual vector<u8> read();
 
 		void flush();
 
@@ -27,12 +32,16 @@ namespace core {
 	};
 
 	struct file_buf : file {
+		file_buf() = default;
 		file_buf(cref<string> fname, access _access);
+		file_buf(file_buf&& other);
 		~file_buf() = default;
 
+		ref<file_buf> operator=(file_buf&& other);
+
 		virtual u32 write(memptr buf);
-		virtual buffer read();
 		virtual u32 read(ref<buffer> buf);
+		virtual vector<u8> read();
 
 		buffer data;
 	};

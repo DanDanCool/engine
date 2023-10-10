@@ -118,7 +118,7 @@ namespace jolly {
 		}
 	}
 
-	void window::vkinit(cref<vk_device> device) {
+	void window::vk_init(cref<vk_device> device) {
 		surface = core::ptr_create<vk_surface>(device);
 
 		auto createcb = [](ref<window> state, u32 id, win_event event) {
@@ -137,11 +137,21 @@ namespace jolly {
 
 		auto closecb = [](ref<window> state, u32 id, win_event event) {
 			ref<vk_surface> surface = state.surface.ref();
-			auto& gpu = surface.device._gpus[surface.device._gpu];
+			auto& gpu = surface.device.main_gpu();
 			ref<vk_swapchain> swapchain = surface.surfaces[id];
+
+			vkDeviceWaitIdle(gpu.device);
+			for (i32 i : core::range(MAX_FRAMES_IN_FLIGHT)) {
+				vkDestroySemaphore(gpu.device, swapchain.image_available[i], nullptr);
+				vkDestroySemaphore(gpu.device, swapchain.render_finished[i], nullptr);
+			}
 
 			for (auto view : swapchain.views) {
 				vkDestroyImageView(gpu.device, view, nullptr);
+			}
+
+			for (auto fb : swapchain.framebuffers) {
+				vkDestroyFramebuffer(gpu.device, fb, nullptr);
 			}
 
 			vkDestroySwapchainKHR(gpu.device, swapchain.swapchain, nullptr);
@@ -158,32 +168,33 @@ namespace jolly {
 		addcb(win_event::close, closecb);
 	}
 
-	void window::vkterm() {
+	void window::vk_term() {
 		auto& _surface = surface.ref();
-		for (auto surf: _surface.surfaces.vals()) {
-			vkDestroySurfaceKHR(_surface.device._instance, surf.surface, nullptr);
+		auto& gpu = _surface.device.main_gpu();
+		for (i32 i : core::range(MAX_FRAMES_IN_FLIGHT)) {
+			vkDestroyFence(gpu.device, _surface.fence[i], nullptr);
 		}
 	}
 
-	void window::vkswapchain() {
+	void window::vk_swapchain_create() {
 		auto createcb = [](ref<window> state, u32 id, win_event event) {
 			auto& surface = state.surface.ref();
-			auto& gpu = surface.device._gpus[surface.device._gpu];
-			auto& surf = surface.surfaces[id];
+			auto& gpu = surface.device.main_gpu();
+			auto& swapchain = surface.surfaces[id];
 
 			VkSurfaceCapabilitiesKHR capabilities{};
-			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu.physical, surf.surface, &capabilities);
+			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu.physical, swapchain.surface, &capabilities);
 
 			u32 count = 0;
-			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, surf.surface, &count, nullptr);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, swapchain.surface, &count, nullptr);
 			core::vector<VkSurfaceFormatKHR> surface_formats(count);
-			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, surf.surface, &count, surface_formats.data);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(gpu.physical, swapchain.surface, &count, surface_formats.data);
 			surface_formats.size = count;
 
 			count = 0;
-			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, surf.surface, &count, nullptr);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, swapchain.surface, &count, nullptr);
 			core::vector<VkPresentModeKHR> present_modes(count);
-			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, surf.surface, &count, nullptr);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(gpu.physical, swapchain.surface, &count, nullptr);
 			present_modes.size = count;
 
 			VkSurfaceFormatKHR format = surface_formats[0];
@@ -210,18 +221,18 @@ namespace jolly {
 			x = core::clamp(x, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
 			y = core::clamp(y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
-			surf.extent = VkExtent2D{x, y};
+			swapchain.extent = VkExtent2D{x, y};
 
 			u32 max_count = capabilities.maxImageCount ? capabilities.maxImageCount : U32_MAX;
 			u32 image_count = min(capabilities.minImageCount + 1, max_count);
 
 			VkSwapchainCreateInfoKHR info{};
 			info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-			info.surface = surf.surface;
+			info.surface = swapchain.surface;
 			info.minImageCount = image_count;
 			info.imageFormat = format.format;
 			info.imageColorSpace = format.colorSpace;
-			info.imageExtent = surf.extent;
+			info.imageExtent = swapchain.extent;
 			info.imageArrayLayers = 1;
 			info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
@@ -240,18 +251,18 @@ namespace jolly {
 			info.clipped = VK_TRUE;
 			info.oldSwapchain = VK_NULL_HANDLE;
 
-			vkCreateSwapchainKHR(gpu.device, &info, nullptr, &surf.swapchain);
+			vkCreateSwapchainKHR(gpu.device, &info, nullptr, &swapchain.swapchain);
 
-			vkGetSwapchainImagesKHR(gpu.device, surf.swapchain, &image_count, nullptr);
-			surf.images = core::vector<VkImage>(image_count);
-			vkGetSwapchainImagesKHR(gpu.device, surf.swapchain, &image_count, surf.images.data);
-			surf.images.size = image_count;
+			vkGetSwapchainImagesKHR(gpu.device, swapchain.swapchain, &image_count, nullptr);
+			swapchain.images = core::vector<VkImage>(image_count);
+			vkGetSwapchainImagesKHR(gpu.device, swapchain.swapchain, &image_count, swapchain.images.data);
+			swapchain.images.size = image_count;
 
-			surf.views = core::vector<VkImageView>(image_count);
+			swapchain.views = core::vector<VkImageView>(image_count);
 			for (u32 i : core::range(image_count)) {
 				VkImageViewCreateInfo info{};
 				info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-				info.image = surf.images[i];
+				info.image = swapchain.images[i];
 				info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 				info.format = surface.format;
 				info.components = VkComponentMapping{
@@ -266,8 +277,15 @@ namespace jolly {
 				info.subresourceRange.baseArrayLayer = 0;
 				info.subresourceRange.layerCount = 1;
 
-				auto& view = surf.views.add();
+				auto& view = swapchain.views.add();
 				vkCreateImageView(gpu.device, &info, nullptr, &view);
+			}
+
+			VkSemaphoreCreateInfo semaphore_info{};
+			semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+			for (i32 i : core::range(MAX_FRAMES_IN_FLIGHT)) {
+				vkCreateSemaphore(gpu.device, &semaphore_info, nullptr, &swapchain.image_available[i]);
+				vkCreateSemaphore(gpu.device, &semaphore_info, nullptr, &swapchain.render_finished[i]);
 			}
 		};
 
@@ -275,15 +293,26 @@ namespace jolly {
 			createcb(*this, id, win_event::create);
 		}
 
+		auto& _surface = surface.ref();
+		auto& gpu = _surface.device.main_gpu();
+		VkFence fence = VK_NULL_HANDLE;
+		VkFenceCreateInfo fence_info{};
+		fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+		for (i32 i : core::range(MAX_FRAMES_IN_FLIGHT)) {
+			vkCreateFence(gpu.device, &fence_info, nullptr, &_surface.fence[i]);
+		}
+
 		addcb(win_event::create, createcb);
 	}
 
-	VkSurfaceKHR window::vksurface() const {
+	ref<vk_swapchain> window::vk_main_swapchain() const {
 		auto& _surface = surface.ref();
-		return _surface.surfaces._vals[0].surface;
+		return _surface.surfaces._vals[0];
 	}
 
-	core::vector<cstr> window::vkextensions(cref<core::vector<VkExtensionProperties>> extensions) const {
+	core::vector<cstr> window::vk_extensions(cref<core::vector<VkExtensionProperties>> extensions) const {
 		bool surface = false, win32_surface = false;
 		for (auto& extension : extensions) {
 			if (core::cmpeq(extension.extensionName, "VK_KHR_surface")) {

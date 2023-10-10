@@ -11,7 +11,7 @@
 #define LOG_CRIT(...) core::logger::instance().crit(core::format_string(__VA_ARGS__))
 
 namespace core {
-	using fmtbuf = buffer_base<BLOCK_256>;
+	using fmtbuf = buffer_base<BLOCK_1024>;
 	template <typename T>
 	void format(cref<T> arg, ref<fmtbuf> buf);
 

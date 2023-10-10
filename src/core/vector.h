@@ -26,7 +26,9 @@ namespace core {
 		}
 
 		vector(cref<vector<type>>& other)
-		: data(other.data), reserve(other.reserve), size(other.size) {}
+		: data(nullptr), reserve(0), size(0) {
+			*this = other;
+		}
 
 		vector(std::initializer_list<type> l)
 		: data(nullptr), reserve(0), size(0) {
@@ -54,6 +56,11 @@ namespace core {
 			data = other.data;
 			reserve = other.reserve;
 			size = other.size;
+
+			ref<vector<type>> tmp = const_cast<vector<type>&>(other);
+			tmp.data = nullptr;
+			tmp.reserve = 0;
+			tmp.size = 0;
 
 			return *this;
 		}
