@@ -36,7 +36,7 @@ namespace jolly {
 	static void win_destroy_cb(ref<window> state, u32 id, win_event event);
 	static LRESULT wndproc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam);
 
-	window::window(cref<core::string> name, core::pair<u32, u32> sz)
+	window::window(cref<core::string> name, math::vec2i sz)
 	: handle()
 	, surface()
 	, windows()
@@ -78,7 +78,7 @@ namespace jolly {
 		add_cb(win_event::destroy, win_destroy_cb);
 	}
 
-	u32 window::create(cref<core::string> name, core::pair<u32, u32> sz) {
+	u32 window::create(cref<core::string> name, math::vec2i sz) {
 		core::lock lock(busy);
 		u32 id = windows.size;
 
@@ -93,7 +93,7 @@ namespace jolly {
 				(LPCWSTR)wname.data,
 				style,
 				CW_USEDEFAULT, CW_USEDEFAULT,
-				sz.one, sz.two,
+				sz.x, sz.y,
 				NULL, NULL, (HINSTANCE)handle.data, NULL
 				);
 
@@ -275,17 +275,17 @@ namespace jolly {
 		return true;
 	}
 
-	void window::size(u32 id, core::pair<u32, u32> sz) {
+	void window::size(u32 id, math::vec2i sz) {
 
 	}
 
-	core::pair<u32, u32> window::size(u32 id) const {
+	math::vec2i window::size(u32 id) const {
 		RECT area{};
 		GetClientRect((HWND)windows[id].data, &area);
-		return core::pair<u32, u32>(area.right, area.bottom);
+		return math::vec2i{area.right, area.bottom};
 	}
 
-	core::pair<u32, u32> window::fbsize(u32 id) const {
+	math::vec2i window::fbsize(u32 id) const {
 		return size(id);
 	}
 
@@ -347,10 +347,10 @@ namespace jolly {
 		}
 
 		auto [x, y] = state.fbsize(id);
-		x = core::clamp(x, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-		y = core::clamp(y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+		x = core::clamp<u32>(x, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+		y = core::clamp<u32>(y, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
-		swapchain.extent = VkExtent2D{x, y};
+		swapchain.extent = VkExtent2D{(u32)x, (u32)y};
 
 		u32 max_count = capabilities.maxImageCount ? capabilities.maxImageCount : U32_MAX;
 		u32 image_count = min(capabilities.minImageCount + 1, max_count);

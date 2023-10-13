@@ -4,11 +4,25 @@
 #include <core/memory.h>
 #include <core/tuple.h>
 #include <core/vector.h>
+#include <math/vec.h>
 
 #include <vulkan/vulkan.h>
 
 namespace jolly {
 	constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
+
+	enum class vertex_data {
+		vec2,
+		vec3,
+	};
+
+	enum class vertex_input {
+		vertex,
+		instance
+	};
+
+	typedef core::pair<vertex_data, u32> vertex_attribute;
+	typedef core::pair<core::vector<vertex_attribute>, vertex_input> binding_description;
 
 	struct window;
 
@@ -21,6 +35,8 @@ namespace jolly {
 		VkPhysicalDevice physical;
 		VkDevice device;
 		vk_queue graphics;
+		vk_queue compute;
+		vk_queue transfer;
 		vk_queue present;
 	};
 
@@ -28,6 +44,14 @@ namespace jolly {
 		VkRenderPass renderpass;
 		VkPipelineLayout layout;
 		VkPipeline pipeline;
+
+		VkBuffer buffer;
+		VkDeviceMemory memory;
+
+		VkBuffer index;
+		VkDeviceMemory index_memory;
+
+		u32 bindings;
 	};
 
 	struct vk_cmdpool {
@@ -47,10 +71,10 @@ namespace jolly {
 
 	struct vk_device {
 		vk_device() = default;
-		vk_device(cref<core::string> name, core::pair<u32, u32> sz = { 1280, 720 });
+		vk_device(cref<core::string> name, math::vec2i sz = { 1280, 720 });
 		~vk_device();
 
-		void pipeline(cref<core::string> fname);
+		void pipeline(cref<core::string> fname, cref<core::vector<binding_description>> layout);
 
 		ref<vk_gpu> main_gpu() const;
 

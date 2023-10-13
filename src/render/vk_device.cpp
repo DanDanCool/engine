@@ -17,7 +17,7 @@ namespace jolly {
 		return VK_FALSE;
 	}
 
-	vk_device::vk_device(cref<core::string> name, core::pair<u32, u32> sz)
+	vk_device::vk_device(cref<core::string> name, math::vec2i sz)
 	: _window()
 	, _instance(VK_NULL_HANDLE)
 	, _debugmsg(VK_NULL_HANDLE)
@@ -123,6 +123,8 @@ namespace jolly {
 
 			u32 graphics = U32_MAX;
 			u32 present = U32_MAX;
+			u32 transfer = U32_MAX;
+			u32 compute = U32_MAX;
 
 			for (int i : core::range(queues.size)) {
 				auto& queue = queues[i];
@@ -136,9 +138,17 @@ namespace jolly {
 				if (queue.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 					graphics = i;
 				}
+
+				if (queue.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+					transfer = i;
+				}
+
+				if (queue.queueFlags & VK_QUEUE_COMPUTE_BIT) {
+					compute = i;
+				}
 			}
 
-			core::set<u32> indices = { graphics, present };
+			core::set<u32> indices = { graphics, present, transfer, compute };
 			core::vector<VkDeviceQueueCreateInfo> queue_info(indices.size);
 			for (u32 i : indices) {
 				if (i == U32_MAX) continue;
@@ -207,6 +217,17 @@ namespace jolly {
 				gpu.present.family = present;
 			}
 
+			gpu.transfer = gpu.graphics;
+			if (transfer != U32_MAX) {
+				vkGetDeviceQueue(gpu.device, transfer, 0, &gpu.transfer.queue);
+				gpu.transfer.family = transfer;
+			}
+
+			if (compute != U32_MAX) {
+				vkGetDeviceQueue(gpu.device, compute, 0, &gpu.compute.queue);
+				gpu.compute.family = compute;
+			}
+
 			// decide if this device is suitable
 			bool all_queues = graphics != U32_MAX && present != U32_MAX;
 			bool discrete = props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
@@ -225,10 +246,14 @@ namespace jolly {
 		assert(_gpu != U32_MAX);
 
 		_window->vk_swapchain_create();
-		pipeline("../assets/shaders/triangle");
+		core::vector<binding_description> bindings{
+			binding_description( core::vector<vertex_attribute>{ {vertex_data::vec2, 0}, {vertex_data::vec3, 1} }, vertex_input::vertex ),
+		};
 
 		auto& gpu = main_gpu();
 		_cmdpool = vk_cmdpool(gpu, gpu.graphics.family);
+
+		pipeline("../assets/shaders/quad", bindings);
 	}
 
 	vk_device::~vk_device() {
@@ -236,6 +261,12 @@ namespace jolly {
 		vkDeviceWaitIdle(gpu.device);
 
 		_cmdpool.destroy(gpu);
+
+		vkDestroyBuffer(gpu.device, _pipeline.buffer, nullptr);
+		vkFreeMemory(gpu.device, _pipeline.memory, nullptr);
+
+		vkDestroyBuffer(gpu.device, _pipeline.index, nullptr);
+		vkFreeMemory(gpu.device, _pipeline.index_memory, nullptr);
 
 		vkDestroyPipelineLayout(gpu.device, _pipeline.layout, nullptr);
 		vkDestroyRenderPass(gpu.device, _pipeline.renderpass, nullptr);
@@ -256,7 +287,7 @@ namespace jolly {
 		_instance = VK_NULL_HANDLE;
 	}
 
-	void vk_device::pipeline(cref<core::string> fname) {
+	void vk_device::pipeline(cref<core::string> fname, cref<core::vector<binding_description>> layout) {
 		auto& gpu = main_gpu();
 
 		auto fvertex = core::fopen(core::format_string("%.vert.spv", fname).data, core::access::ro);
@@ -303,12 +334,61 @@ namespace jolly {
 		dynamic_info.dynamicStateCount = dynamic.size;
 		dynamic_info.pDynamicStates = dynamic.data;
 
+		auto parse_layout = [](cref<core::vector<binding_description>> layout) {
+			auto vk_vertex_data_format = [](vertex_data data) {
+				using pair = core::pair<VkFormat, u32>;
+				switch (data) {
+					case vertex_data::vec2:
+						return pair{ VK_FORMAT_R32G32_SFLOAT, sizeof(math::vec2f) };
+					case vertex_data::vec3:
+						return pair{ VK_FORMAT_R32G32B32_SFLOAT, sizeof(math::vec3f) };
+				}
+
+				return pair{ VK_FORMAT_UNDEFINED, 0 };
+			};
+
+			auto vk_vertex_input_rate = [](vertex_input input) {
+				switch (input) {
+					case vertex_input::vertex:
+						return VK_VERTEX_INPUT_RATE_VERTEX;
+					case vertex_input::instance:
+						return VK_VERTEX_INPUT_RATE_INSTANCE;
+				}
+
+				// probably wrong but whatever
+				return VK_VERTEX_INPUT_RATE_VERTEX;
+			};
+
+			core::vector<VkVertexInputBindingDescription> bindings(0);
+			core::vector<VkVertexInputAttributeDescription> attributes(0);
+			for (u32 i : core::range(layout.size)) {
+				u32 stride = 0;
+				for (auto [data, location] : layout[i].one) {
+					auto [format, size] = vk_vertex_data_format(data);
+					auto& attribute = attributes.add();
+					attribute.binding = i;
+					attribute.location = location;
+					attribute.format = format;
+					attribute.offset = stride;
+					stride += size;
+				}
+				auto& binding = bindings.add();
+				binding.binding = i;
+				binding.stride = stride;
+				binding.inputRate = vk_vertex_input_rate(layout[i].two);
+			}
+
+			return core::pair{ bindings, attributes };
+		};
+
+		auto [ bindings, attributes ] = parse_layout(layout);
 		VkPipelineVertexInputStateCreateInfo vertex_info{};
 		vertex_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertex_info.vertexBindingDescriptionCount = 0;
-		vertex_info.pVertexBindingDescriptions = nullptr;
-		vertex_info.vertexAttributeDescriptionCount = 0;
-		vertex_info.pVertexAttributeDescriptions = nullptr;
+		vertex_info.vertexBindingDescriptionCount = bindings.size;
+		vertex_info.pVertexBindingDescriptions = bindings.data;
+		vertex_info.vertexAttributeDescriptionCount = attributes.size;
+		vertex_info.pVertexAttributeDescriptions = attributes.data;
+		_pipeline.bindings = bindings.size;
 
 		VkPipelineInputAssemblyStateCreateInfo assembly_info{};
 		assembly_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -439,6 +519,120 @@ namespace jolly {
 
 		_window->add_cb(win_event::create, vk_framebuffer_create_cb);
 
+		{
+			auto create_buffer = [](cref<vk_gpu> gpu, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) {
+				VkBufferCreateInfo buffer_info{};
+				buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				buffer_info.size = size;
+				buffer_info.usage = usage;
+				buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+				VkBuffer buffer = VK_NULL_HANDLE;
+				vkCreateBuffer(gpu.device, &buffer_info, nullptr, &buffer);
+
+				VkMemoryRequirements mem_requirements{};
+				vkGetBufferMemoryRequirements(gpu.device, buffer, &mem_requirements);
+
+				VkPhysicalDeviceMemoryProperties mem_properties{};
+				vkGetPhysicalDeviceMemoryProperties(gpu.physical, &mem_properties);
+
+				u32 type_index = U32_MAX;
+				for (i32 i : core::range(mem_properties.memoryTypeCount)) {
+					bool type_match = mem_requirements.memoryTypeBits & (1 << i);
+					bool property_match = (mem_properties.memoryTypes[i].propertyFlags & properties) == properties;
+					if (type_match && property_match) {
+						type_index = i;
+						break;
+					}
+				}
+
+				VkMemoryAllocateInfo alloc_info{};
+				alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+				alloc_info.allocationSize = mem_requirements.size;
+				alloc_info.memoryTypeIndex = type_index;
+
+				VkDeviceMemory memory = VK_NULL_HANDLE;
+				vkAllocateMemory(gpu.device, &alloc_info, nullptr, &memory);
+				vkBindBufferMemory(gpu.device, buffer, memory, 0);
+
+				return core::pair { buffer, memory };
+			};
+
+			core::vector<f32> vertices = {
+				-0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+				+0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+				+0.5f, +0.5f, 0.0f, 0.0f, 1.0f,
+				-0.5f, +0.5f, 1.0f, 1.0f, 1.0f
+			};
+
+			core::vector<u32> indices = {
+				0, 1, 2, 2, 3, 0
+			};
+
+			u32 vdata_size = vertices.size * sizeof(f32);
+			auto [ vstaging_buffer, vstaging_memory ] = create_buffer(gpu, vdata_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+			void* gpu_memory = nullptr;
+			vkMapMemory(gpu.device, vstaging_memory, 0, vdata_size, 0, &gpu_memory);
+			core::copy8((u8*)vertices.data, (u8*)gpu_memory, vdata_size);
+			vkUnmapMemory(gpu.device, vstaging_memory);
+
+			u32 idata_size = indices.size * sizeof(u32);
+			auto [ istaging_buffer, istaging_memory ] = create_buffer(gpu, idata_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+			vkMapMemory(gpu.device, istaging_memory, 0, idata_size, 0, &gpu_memory);
+			core::copy8((u8*)indices.data, (u8*)gpu_memory, idata_size);
+			vkUnmapMemory(gpu.device, istaging_memory);
+
+			auto [ vertex_buffer, vertex_memory ] = create_buffer(gpu, vdata_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			auto [ index_buffer, index_memory ] = create_buffer(gpu, idata_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+			VkCommandBufferAllocateInfo alloc_info{};
+			alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			alloc_info.commandPool = _cmdpool.pool;
+			alloc_info.commandBufferCount = 1;
+
+			VkCommandBuffer cmdbuf = VK_NULL_HANDLE;
+			vkAllocateCommandBuffers(gpu.device, &alloc_info, &cmdbuf);
+
+			VkCommandBufferBeginInfo begin_info{};
+			begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+			begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+			vkBeginCommandBuffer(cmdbuf, &begin_info);
+
+			VkBufferCopy copy_region{};
+			copy_region.srcOffset = 0;
+			copy_region.dstOffset = 0;
+			copy_region.size = vdata_size;
+			vkCmdCopyBuffer(cmdbuf, vstaging_buffer, vertex_buffer, 1, &copy_region);
+
+			copy_region.size = idata_size;
+			vkCmdCopyBuffer(cmdbuf, istaging_buffer, index_buffer, 1, &copy_region);
+
+			vkEndCommandBuffer(cmdbuf);
+
+			VkSubmitInfo submit_info{};
+			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submit_info.commandBufferCount = 1;
+			submit_info.pCommandBuffers = &cmdbuf;
+
+			vkQueueSubmit(gpu.graphics.queue, 1, &submit_info, VK_NULL_HANDLE);
+			vkQueueWaitIdle(gpu.graphics.queue);
+
+			vkFreeCommandBuffers(gpu.device, _cmdpool.pool, 1, &cmdbuf);
+			vkDestroyBuffer(gpu.device, vstaging_buffer, nullptr);
+			vkFreeMemory(gpu.device, vstaging_memory, nullptr);
+			vkDestroyBuffer(gpu.device, istaging_buffer, nullptr);
+			vkFreeMemory(gpu.device, istaging_memory, nullptr);
+
+			_pipeline.buffer = vertex_buffer;
+			_pipeline.memory = vertex_memory;
+			_pipeline.index = index_buffer;
+			_pipeline.index_memory = index_memory;
+		}
+
 		vkDestroyShaderModule(gpu.device, vmodule, nullptr);
 		vkDestroyShaderModule(gpu.device, fmodule, nullptr);
 	}
@@ -494,6 +688,11 @@ namespace jolly {
 			vkCmdBeginRenderPass(cmdbuf, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 			vkCmdBindPipeline(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, _pipeline.pipeline);
 
+			VkBuffer vertex_buffers[] = { _pipeline.buffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(cmdbuf, 0, 1, vertex_buffers, offsets);
+			vkCmdBindIndexBuffer(cmdbuf, _pipeline.index, 0, VK_INDEX_TYPE_UINT32);
+
 			VkViewport viewport{};
 			viewport.x = 0;
 			viewport.y = 0;
@@ -508,7 +707,7 @@ namespace jolly {
 			scissor.extent = swapchain.extent;
 			vkCmdSetScissor(cmdbuf, 0, 1, &scissor);
 
-			vkCmdDraw(cmdbuf, 3, 1, 0, 0);
+			vkCmdDrawIndexed(cmdbuf, 6, 1, 0, 0, 0);
 			vkCmdEndRenderPass(cmdbuf);
 			vkEndCommandBuffer(cmdbuf);
 

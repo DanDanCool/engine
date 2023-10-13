@@ -1,11 +1,11 @@
 #pragma once
 
 #include <core/memory.h>
-#include <core/tuple.h>
 #include <core/string.h>
 #include <core/vector.h>
 #include <core/table.h>
 #include <core/lock.h>
+#include <math/vec.h>
 
 #include <vulkan/vulkan.h>
 
@@ -25,12 +25,12 @@ namespace jolly {
 
 	struct window {
 		window() = default;
-		window(cref<core::string> name, core::pair<u32, u32> sz = {1280, 720});
+		window(cref<core::string> name, math::vec2i sz = {1280, 720});
 		~window();
 
 		void _defaults();
 
-		u32 create(cref<core::string> name, core::pair<u32, u32> sz = {1280, 720});
+		u32 create(cref<core::string> name, math::vec2i sz = {1280, 720});
 
 		void step(f32 ms);
 
@@ -46,9 +46,9 @@ namespace jolly {
 		void callback(u32 id, win_event event);
 		void add_cb(win_event event, pfn_win_cb cb);
 
-		void size(u32 id, core::pair<u32, u32> sz);
-		core::pair<u32, u32> size(u32 id) const;
-		core::pair<u32, u32> fbsize(u32 id) const; // size of framebuffer
+		void size(u32 id, math::vec2i sz);
+		math::vec2i size(u32 id) const;
+		math::vec2i fbsize(u32 id) const; // size of framebuffer
 
 		core::ptr<void> handle;
 		core::ptr<vk_surface> surface; // stores rendering device info
