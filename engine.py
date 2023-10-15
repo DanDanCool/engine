@@ -3,6 +3,8 @@ import argparse
 import subprocess
 from pathlib import Path
 
+jmake.setupenv()
+
 workspace = jmake.Workspace("engine")
 
 engine = jmake.Project("engine", jmake.Target.EXECUTABLE)
