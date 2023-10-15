@@ -110,3 +110,19 @@ u8* bytes(cref<T> val) {
 #else
 #define JOLLY_API
 #endif
+
+#define PAREN ()
+
+#define STR(x) #x
+#define CAT(a, ...) CAT_(a, __VA_ARGS__)
+#define CAT_(a, ...) a ## __VA_ARGS__
+
+#define EMPTY()
+#define DEFER(id) id EMPTY()
+#define OBSTRUCT(...) __VA_ARGS__ DEFER(EMPTY)()
+
+#define EXPAND(...) EXPAND1(EXPAND1(EXPAND1(EXPAND1(__VA_ARGS__))))
+#define EXPAND1(...) EXPAND2(EXPAND2(EXPAND2(EXPAND2(__VA_ARGS__))))
+#define EXPAND2(...) EXPAND3(EXPAND3(EXPAND3(EXPAND3(__VA_ARGS__))))
+#define EXPAND3(...) EXPAND4(EXPAND4(EXPAND4(EXPAND4(__VA_ARGS__))))
+#define EXPAND4(...) __VA_ARGS__

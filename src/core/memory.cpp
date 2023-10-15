@@ -60,9 +60,13 @@ namespace core {
 	}
 
 	void zero256(u8* dst, u32 bytes) {
+		set256(0, dst, bytes);
+	}
+
+	void set256(u32 src, u8* dst, u32 bytes) {
 		assert((bytes % BLOCK_32) == 0);
 		u32 count = bytes / BLOCK_32;
-		const __m256i zero = _mm256_set1_epi32(0);
+		const __m256i zero = _mm256_set1_epi32(src);
 		for (u32 i = 0; i < count; i++) {
 			_mm256_store_si256((__m256i*)dst, zero);
 			dst += BLOCK_32;
@@ -79,5 +83,9 @@ namespace core {
 		for (u32 i = 0; i < bytes; i++) {
 			dst[i] = 0;
 		}
+	}
+
+	any::~any() {
+		deleter(data);
 	}
 }

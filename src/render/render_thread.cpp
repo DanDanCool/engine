@@ -19,7 +19,7 @@ namespace jolly {
 	}
 
 	void render_thread::term() {
-		_run.set(false, core::memory_order::relaxed);
+		_run.set(false, core::memory_order_relaxed);
 
 		system_thread::term();
 	}
@@ -28,12 +28,12 @@ namespace jolly {
 		_device = core::ptr_create<vk_device>("jolly");
 
 		f32 dt = 0;
-		bool run = _run.get(core::memory_order::relaxed);
+		bool run = _run.get(core::memory_order_relaxed);
 
 		while (run) {
 			core::timer timer(dt);
 			_device->step(dt);
-			run = _run.get(core::memory_order::relaxed);
+			run = _run.get(core::memory_order_relaxed);
 		}
 	}
 

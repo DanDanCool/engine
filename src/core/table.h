@@ -129,7 +129,7 @@ namespace core {
 			_sparse[_dense[_sparse[idx]]] = _sparse[idx];
 
 			ref<key_type> _key = _keys[idx];
-			_keys._cleanup<is_destructible_v<key_type>>(_key);
+			core::destroy(&_key);
 			zero8(bytes(_key), sizeof(key_type));
 
 			_hash[idx] = 0;
@@ -156,24 +156,6 @@ namespace core {
 			}
 
 			return _vals[_sparse[idx]];
-		}
-
-		struct val_view {
-			val_view(cref<vector<val_type>> in) : data(in) {}
-
-			auto begin() {
-				return data.begin();
-			}
-
-			auto end() {
-				return data.end();
-			}
-
-			cref<vector<val_type>> data;
-		};
-
-		val_view vals() {
-			return val_view(_vals);
 		}
 
 		struct key_view {
@@ -212,9 +194,19 @@ namespace core {
 			cref<vector<u32>> dense;
 		};
 
-		key_view keys() {
-			return key_view(_keys, _dense);
-		}
+		struct val_view {
+			val_view(cref<vector<val_type>> in) : data(in) {}
+
+			auto begin() {
+				return data.begin();
+			}
+
+			auto end() {
+				return data.end();
+			}
+
+			cref<vector<val_type>> data;
+		};
 
 		struct iterator {
 			using pair_type = pair<ref<key_type>, ref<val_type>>;
@@ -240,6 +232,14 @@ namespace core {
 			cref<vector<u32>> dense;
 			u32 idx;
 		};
+
+		key_view keys() {
+			return key_view(_keys, _dense);
+		}
+
+		val_view vals() {
+			return val_view(_vals);
+		}
 
 		auto begin() {
 			return iterator(_keys, _vals, _dense, 0);

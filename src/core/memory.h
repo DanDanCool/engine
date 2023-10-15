@@ -38,6 +38,7 @@ namespace core {
 
 	void copy256(u8* src, u8* dst, u32 bytes);
 	void zero256(u8* dst, u32 bytes);
+	void set256(u32 src, u8* dst, u32 bytes);
 	void copy8(u8* src, u8* dst, u32 bytes);
 	void zero8(u8* dst, u32 bytes);
 
@@ -86,7 +87,8 @@ namespace core {
 		}
 
 		void destroy() {
-			cleanup<is_destructible<type>::value>();
+			// there is core::destroy, but this is necessary to deal with void*
+			core::destroy(data);
 			free8(data);
 			data = nullptr;
 		}
@@ -103,16 +105,10 @@ namespace core {
 		ptr<S> cast() {
 			ptr<S> p((S*)data);
 			data = nullptr;
-			return p;
+			return move_data(p);
 		}
 
 		type* data;
-
-		private:
-		template<bool> void cleanup() {}
-		template<> void cleanup<true>() {
-			data->~type();
-		}
 	};
 
 	template <typename T>
@@ -141,6 +137,52 @@ namespace core {
 		data = new (data) T(forward_data(args)...);
 		return move_data(ptr<T>(data));
 	}
+
+	struct any {
+		typedef void (*pfn_deleter)(cref<ptr<void>> data);
+		any() = default;
+
+		template<typename T>
+		any(T* in)
+		: data(nullptr), deleter(nullptr) {
+			*this = in;
+		}
+
+		template<typename T>
+		any(ptr<T>&& in)
+		: data(nullptr), deleter(nullptr) {
+			*this = move_data(in);
+		}
+
+		~any();
+
+		template<typename T>
+		ref<any> operator=(T* in) {
+			data = (void*)in;
+			deleter = destroy<T>;
+			return *this;
+		}
+
+		template<typename T>
+		ref<any> operator=(ptr<T>&& in) {
+			data = move_data(in.cast<void>());
+			deleter = destroy<T>;
+			return *this;
+		}
+
+		template <typename T>
+		ref<T> ref() const {
+			return data.ref<T>();
+		}
+
+		template<typename T>
+		static void destroy(cref<ptr<void>> data) {
+			core::destroy((T*)data.data);
+		}
+
+		ptr<void> data;
+		pfn_deleter deleter;
+	};
 
 	template<u32 N>
 	struct buffer_base {

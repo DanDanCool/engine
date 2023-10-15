@@ -1,33 +1,60 @@
 #pragma once
 
 #include "core.h"
-#include <atomic>
+#include <win32/atom.h>
+
+#define ATOM_DEFINE_GET(order) \
+type get(order) const { \
+	return atomic_load<type, order>(*this); \
+}
+
+#define ATOM_DEFINE_SET(order) \
+void set(type data, order) { \
+	atomic_store<type, order>(*this, data); \
+}
+
+#define ATOM_DEFINE_CMPXCHG(success, failure) \
+bool cmpxchg(ref<type> expected, type desired, success, failure) { \
+	return atomic_cmpxchg<type, success, failure>(*this, expected, desired); \
+}
 
 namespace core {
-	enum class memory_order {
-		relaxed = std::memory_order_relaxed,
-		consume = std::memory_order_consume,
-		release = std::memory_order_release,
-	};
+	constexpr auto memory_order_relaxed = _memory_order_relaxed{};
+	constexpr auto memory_order_release = _memory_order_release{};
+	constexpr auto memory_order_acquire = _memory_order_acquire{};
 
 	template <typename T>
-	struct atom {
+	struct atom : public atom_base<T> {
 		using type = T;
-		atom() = default;
-		atom(cref<type> in) : data(in) {}
+		using atom_base::atom_base;
 
-		type get(memory_order order) {
-			return std::atomic_load_explicit(&data, (std::memory_order)order);
+		template<typename order>
+		type get(order) const {
+			static_assert(false);
+			return atom_base::data;
 		}
 
-		void set(type in, memory_order order) {
-			std::atomic_store_explicit(&data, in, (std::memory_order)order);
+		ATOM_DEFINE_GET(_memory_order_relaxed);
+		ATOM_DEFINE_GET(_memory_order_acquire);
+
+
+		template<typename order>
+		void set(type data, order) {
+			static_assert(false);
 		}
 
-		bool cmpxchg(ref<type> expected, type desired, memory_order success, memory_order failure) {
-			return std::atomic_compare_exchange_weak(&data, &expected, desired, (std::memory_order)success, (std::memory_order)failure);
+		ATOM_DEFINE_SET(_memory_order_relaxed);
+		ATOM_DEFINE_SET(_memory_order_release);
+
+		template<typename success, typename failure>
+		bool cmpxchg(ref<type> expected, type desired, success, failure) {
+			static_assert(false);
+			return false;
 		}
 
-		std::atomic<T> data;
+		ATOM_DEFINE_CMPXCHG(_memory_order_relaxed, _memory_order_relaxed);
+		ATOM_DEFINE_CMPXCHG(_memory_order_relaxed, _memory_order_release);
+		ATOM_DEFINE_CMPXCHG(_memory_order_release, _memory_order_relaxed);
+		ATOM_DEFINE_CMPXCHG(_memory_order_release, _memory_order_release);
 	};
 }

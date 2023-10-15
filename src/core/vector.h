@@ -83,7 +83,7 @@ namespace core {
 
 		void destroy() {
 			for (int i : range(size)) {
-				_cleanup<is_destructible_v<type>>(data[i]);
+				core::destroy(&data[i]);
 			}
 
 			free256((void*)data);
@@ -119,7 +119,7 @@ namespace core {
 
 		void del(u32 idx) {
 			size--;
-			_cleanup<is_destructible_v<type>>(data[idx]);
+			core::destroy(&data[idx]);
 			copy8(bytes(data[size]), bytes(data[idx]), sizeof(type));
 			zero8(bytes(data[size]), sizeof(type));
 		}
@@ -150,14 +150,6 @@ namespace core {
 			}
 		};
 
-		forward_iterator begin() const {
-			return forward_iterator(&data[0]);
-		}
-
-		forward_iterator end() const {
-			return forward_iterator(&data[size]);
-		}
-
 		struct reverse_iterator : public iterator_base {
 			reverse_iterator(type* in): iterator_base(in) {}
 			ref<reverse_iterator> operator++() {
@@ -166,17 +158,20 @@ namespace core {
 			}
 		};
 
+		forward_iterator begin() const {
+			return forward_iterator(&data[0]);
+		}
+
+		forward_iterator end() const {
+			return forward_iterator(&data[size]);
+		}
+
 		reverse_iterator rbegin() const {
 			return reverse_iterator(&data[size - 1]);
 		}
 
 		reverse_iterator rend() const {
 			return reverse_iterator(&data[-1]);
-		}
-
-		template<bool val> void _cleanup(ref<type> obj) {};
-		template<> void _cleanup<true>(ref<type> obj) {
-				obj.~type();
 		}
 
 		type* data;

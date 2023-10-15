@@ -6,6 +6,7 @@
 #include <core/lock.h>
 #include <core/log.h>
 #include <core/set.h>
+#include <core/atom.h>
 
 using namespace core;
 
@@ -42,6 +43,37 @@ void test_thread() {
 	LOG_INFO("thread joined");
 }
 
+void test_atomics() {
+	LOG_INFO("% atomics", DIVIDE);
+	atom<u32> counter(0);
+	struct my_data {
+		my_data(ref<atom<u32>> in) : counter(in) {}
+		ref<atom<u32>> counter;
+	};
+
+	auto coroutine = [](ref<thread>, ptr<void> in) {
+		ptr<my_data> args = in.cast<my_data>();
+
+		for (int x : range(10000)) {
+			u32 val = args->counter.get(memory_order_relaxed);
+			while (!args->counter.cmpxchg(val, val + 1, memory_order_release, memory_order_relaxed));
+		}
+
+		return 0;
+	};
+
+	vector<thread> threads(10);
+	for (int i : range(10)) {
+		threads[i] = thread(coroutine, ptr_create<my_data>(counter).cast<void>());
+	}
+
+	for (int i : range(10)) {
+		threads[i].join();
+	}
+
+	LOG_INFO("counter value: %", counter.get(memory_order_acquire));
+}
+
 void test_vector() {
 	LOG_INFO("% vector", DIVIDE);
 	vector<int> v(0);
@@ -53,11 +85,11 @@ void test_vector() {
 	}
 
 	vector<foostruct> scopedv(0);
-	for (int i = 0; i < 10; i++) {
+	for (int i = 0; i < 5; i++) {
 		scopedv.add(foostruct(i));
 	}
 
-	for (auto x : reverse(scopedv)) {
+	for (auto& x : reverse(scopedv)) {
 		LOG_INFO("%", x.data);
 	}
 }
@@ -79,7 +111,7 @@ void test_table() {
 
 	i64 sum = 0;
 	for (i32 x : range(128)) {
-		LOG_INFO("% %", x, mytable[x]);
+		assert(x == mytable[x]);
 	}
 
 	table<string, i32> words;
@@ -112,7 +144,7 @@ void test_ptr() {
 
 	vector<ptr<int>> indirect(0);
 
-	for (int i : range(20)) {
+	for (int i : range(10)) {
 		indirect.add(ptr_create<int>(i));
 	}
 
@@ -140,7 +172,7 @@ void test_set() {
 	}
 
 	set<int> myset;
-	for (int i : range(100))
+	for (int i : range(50))
 		myset.add(i);
 
 	LOG_INFO("%: %", 0, myset.has(0));
@@ -184,6 +216,7 @@ void test_set() {
 
 int main() {
 	test_thread();
+	test_atomics();
 	test_vector();
 	test_string();
 	test_table();

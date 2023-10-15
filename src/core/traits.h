@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core.h"
+
 #define move_data(...) static_cast<core::raw_type_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
 #define forward_data(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
 
@@ -60,4 +62,25 @@ namespace core {
 
 	template <typename T>
 	using raw_type_t = typename raw_type<T>::type;
+
+	template <bool val>
+	struct _destroy {
+		template<typename T>
+		static void destroy(T* data) {
+			// do nothing;
+		}
+	};
+
+	template <>
+	struct _destroy<true> {
+		template<typename T>
+		static void destroy(T* data) {
+			data->~T();
+		}
+	};
+
+	template <typename T>
+	void destroy(T* data) {
+		_destroy<is_destructible_v<T>>::destroy<T>(data);
+	};
 }

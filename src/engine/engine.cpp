@@ -30,7 +30,7 @@ namespace jolly {
 	void engine::run() {
 		f32 dt = 0;
 
-		bool run = _run.get(core::memory_order::relaxed);
+		bool run = _run.get(core::memory_order_relaxed);
 		while (run) {
 			core::lock lock(_lock);
 			core::timer timer(dt);
@@ -38,12 +38,12 @@ namespace jolly {
 				sys->step(dt);
 			}
 
-			run = _run.get(core::memory_order::relaxed);
+			run = _run.get(core::memory_order_relaxed);
 		}
 	}
 
 	void engine::stop() {
-		_run.set(false, core::memory_order::relaxed);
+		_run.set(false, core::memory_order_relaxed);
 	}
 
 	ref<engine> engine::instance() {

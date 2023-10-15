@@ -121,7 +121,7 @@ namespace core {
 			if (idx == U32_MAX) return;
 
 			ref<type> _key = _keys[idx];
-			_keys._cleanup<is_destructible_v<type>>(_key);
+			core::destroy(&_key);
 			zero8(bytes(_key), sizeof(type));
 			_hash[idx] = 0;
 
@@ -129,45 +129,44 @@ namespace core {
 		}
 
 		struct iterator {
-			iterator(cref<vector<type>> _keys, u32* _hash, u32 _size, u32 _reserve)
-				: keys(_keys), hash(_hash), size(_size), reserve(_reserve) {}
+			iterator(cref<vector<type>> _keys, cref<vector<u32>> _hash, u32 _idx)
+				: keys(_keys), hash(_hash), idx(_idx) {}
 
 			ref<iterator> operator++() {
-				if (reserve <= ++size) return *this;
-				hash++;
-				while (*hash == 0) {
-					hash++;
+				for (u32 i : range(idx + 1, hash.reserve)) {
+					idx = i;
+					if (hash[idx]) break;
 				}
-
 				return *this;
 			}
 
 			bool operator!=(cref<iterator> other) const {
-				return size != other.size;
+				return idx != other.idx;
 			}
 
 			ref<type> operator*() const {
-				u32 i = *hash % reserve;
-				return keys[i];
+				return keys[idx];
 			}
 
 			cref<vector<type>> keys;
-			u32* hash;
-			u32 size;
-			u32 reserve;
+			cref<vector<u32>> hash;
+			u32 idx;
 		};
 
 		auto begin() {
-			u32* hash = _hash.data;
-			while (*hash == 0) {
-				hash++;
+			u32 idx = 0;
+			for (u32 i : range(_hash.reserve)) {
+				if (_hash[i]) {
+					idx = i;
+					break;
+				}
 			}
 
-			return iterator(_keys, hash, 0, reserve);
+			return iterator(_keys, _hash, idx);
 		}
 
 		auto end() {
-			return iterator(_keys, _hash.data, size, reserve);
+			return iterator(_keys, _hash, _hash.reserve - 1);
 		}
 
 		vector<u32> _hash;
