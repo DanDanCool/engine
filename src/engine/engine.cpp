@@ -7,7 +7,7 @@ namespace jolly {
 
 	engine::engine()
 	: _systems(), _lock(), _run(true) {
-		assert(_instance.data == nullptr);
+		JOLLY_ASSERT(_instance.data == nullptr, "cannot have more than one engine instance");
 	}
 
 	engine::~engine() {

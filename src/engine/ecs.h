@@ -62,21 +62,21 @@ namespace jolly {
 
 		void add(e_id e, cref<type> item) {
 			core::lock lock(busy);
-			assert(!has(e));
+			JOLLY_ASSERT(!has(e), "entity already contains this component");
 			_add_entity(e);
 			components.add(item);
 		}
 
 		ref<type> add(e_id e) {
 			core::lock lock(busy);
-			assert(!has(e));
+			JOLLY_ASSERT(!has(e), "entity already contains this component");
 			_add_entity(e);
 			return components.add();
 		}
 
 		void del(e_id e) {
 			core::lock lock(busy);
-			assert(has(e));
+			JOLLY_ASSERT(has(e), "entity does not contain this component");
 			u32 index = _index(e);
 			dense.del(index);
 			components.del(index);
@@ -89,7 +89,7 @@ namespace jolly {
 		}
 
 		ref<T> get(e_id e) {
-			assert(has(e));
+			JOLLY_ASSERT(has(e), "entity does not contain this component");
 			return components[_index(e)];
 		}
 
@@ -154,7 +154,7 @@ namespace jolly {
 		template<typename T>
 		void register() {
 			core::lock lock(busy);
-			assert(pools.size < MAX_POOLS);
+			JOLLY_ASSERT(pools.size < MAX_POOLS, "max pool size reached");
 			u32 index = pools.size;
 			pool_index<T>::value = index;
 			auto& pool = pools.add();
@@ -163,20 +163,12 @@ namespace jolly {
 
 		template<typename T>
 		void add(e_id e, cref<T> item) {
-			u32 index = pool_index<T>::value;
-			if (index == U32_MAX)
-				register<T>();
-
 			auto& pool = view<T>();
 			pool.add(e, item);
 		}
 
 		template <typename T>
 		ref<T> add(e_id e) {
-			u32 index = pool_index<T>::value;
-			if (index == U32_MAX)
-				register<T>();
-
 			auto& pool = view<T>();
 			return pool.add();
 		}
@@ -196,7 +188,8 @@ namespace jolly {
 		template<typename T>
 		auto view() const {
 			u32 index = pool_index<T>::value;
-			assert(index != U32_MAX);
+			if (index == U32_MAX)
+				register<T>();
 			return pools[index].ref<pool<T>>();
 		}
 

@@ -26,7 +26,7 @@ static VkResult vkCreateWin32SurfaceKHR(
 		const VkAllocationCallbacks* callbacks,
 		VkSurfaceKHR* surface) {
 	auto fn = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
-	assert(fn);
+	JOLLY_ASSERT(fn, "could not load vkCreateWin32SurfaceKHR");
 	return fn(instance, info, callbacks, surface);
 }
 
@@ -262,7 +262,7 @@ namespace jolly {
 			}
 		}
 
-		assert(surface && win32_surface);
+		JOLLY_ASSERT(surface && win32_surface, "could not find required instance extensions");
 
 		return core::vector{ "VK_KHR_surface", "VK_KHR_win32_surface" };
 	}
@@ -336,7 +336,7 @@ namespace jolly {
 
 		if (surface.format == VK_FORMAT_UNDEFINED)
 			surface.format = format.format;
-		assert(surface.format == format.format);
+		JOLLY_ASSERT(surface.format == format.format, "format does not match main format!");
 
 		VkPresentModeKHR present = VK_PRESENT_MODE_FIFO_KHR;
 		for (auto& available: present_modes) {

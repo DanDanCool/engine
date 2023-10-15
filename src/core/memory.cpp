@@ -1,6 +1,5 @@
 #include "memory.h"
 #include "simd.h"
-#include <assert.h>
 #include <stdlib.h>
 
 #ifdef JOLLY_WIN32
@@ -49,7 +48,7 @@ namespace core {
 	}
 
 	void copy256(u8* src, u8* dst, u32 bytes) {
-		assert((bytes % BLOCK_32) == 0);
+		JOLLY_ASSERT((bytes % BLOCK_32) == 0, "bytes must be a multiple of 32");
 		u32 count = bytes / BLOCK_32;
 		for (u32 i = 0; i < count; i++) {
 			__m256i tmp = _mm256_load_si256((__m256i*)src);
@@ -64,7 +63,7 @@ namespace core {
 	}
 
 	void set256(u32 src, u8* dst, u32 bytes) {
-		assert((bytes % BLOCK_32) == 0);
+		JOLLY_ASSERT((bytes % BLOCK_32) == 0, "bytes must be a multiple of 32");
 		u32 count = bytes / BLOCK_32;
 		const __m256i zero = _mm256_set1_epi32(src);
 		for (u32 i = 0; i < count; i++) {

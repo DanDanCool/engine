@@ -49,7 +49,7 @@ namespace jolly {
 				}
 			}
 
-			assert(found);
+			JOLLY_ASSERT(found, "validation layer not found");
 		}
 
 		VkApplicationInfo app_info{};
@@ -243,7 +243,7 @@ namespace jolly {
 			}
 		}
 
-		assert(_gpu != U32_MAX);
+		JOLLY_ASSERT(_gpu != U32_MAX, "could not find suitable gpu");
 
 		_window->vk_swapchain_create();
 		core::vector<binding_description> bindings{

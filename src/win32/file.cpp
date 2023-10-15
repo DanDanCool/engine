@@ -46,11 +46,11 @@ namespace core {
 		int fd = get_fd(handle);
 
 		i32 bytes = (i32)_lseek(fd, 0, SEEK_END);
-		assert(bytes >= 0);
+		JOLLY_ASSERT(bytes >= 0, "file seek failed!");
 		vector<u8> buffer(bytes);
 		buffer.size = bytes;
 		bytes = (i32)_lseek(fd, 0, SEEK_SET);
-		assert(bytes >= 0);
+		JOLLY_ASSERT(bytes >= 0, "file seek failed!");
 		_read(fd, buffer.data, buffer.size);
 
 		return move_data(buffer);

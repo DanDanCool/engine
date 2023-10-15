@@ -116,13 +116,13 @@ namespace core {
 
 		ref<val_type> get(cref<key_type> key) const {
 			u32 idx = _find(key);
-			assert(idx != U32_MAX);
+			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
 			return _vals[_sparse[idx]];
 		}
 
 		void del(cref<key_type> key) {
 			u32 idx = _find(key);
-			assert(idx != U32_MAX);
+			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
 
 			_dense.del(_sparse[idx]);
 			_vals.del(_sparse[idx]);

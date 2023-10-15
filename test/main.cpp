@@ -7,6 +7,7 @@
 #include <core/log.h>
 #include <core/set.h>
 #include <core/atom.h>
+#include <core/core.h>
 
 using namespace core;
 
@@ -24,6 +25,11 @@ struct basicstruct {
 	basicstruct(int _a, int _b, int _c, int _d) : a(_a), b(_b), c(_c), d(_d) {}
 	int a, b, c, d;
 };
+
+void test_assert() {
+	LOG_INFO("% assert", DIVIDE);
+	JOLLY_ASSERT(3 == 4, "3 does not equal 4!");
+}
 
 void test_thread() {
 	LOG_INFO("% thread", DIVIDE);
@@ -111,7 +117,7 @@ void test_table() {
 
 	i64 sum = 0;
 	for (i32 x : range(128)) {
-		assert(x == mytable[x]);
+		JOLLY_ASSERT(x == mytable[x]);
 	}
 
 	table<string, i32> words;
@@ -215,6 +221,7 @@ void test_set() {
  }
 
 int main() {
+	test_assert();
 	test_thread();
 	test_atomics();
 	test_vector();

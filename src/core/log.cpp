@@ -8,6 +8,16 @@
 #define FORMAT_INT(type) \
 template<> void format<type>(cref<type> arg, ref<fmtbuf> buf) { format<i64>((i64)arg, buf); }
 
+namespace assert {
+	cstr message(cstr msg) {
+		return msg;
+	}
+
+	void callback(cstr expr, cstr file, int line, cstr message) {
+		LOG_CRIT("% failed! in file: %, line: %\n%", expr, file, line, message);
+	}
+}
+
 namespace core {
 	file_buf fopen(cref<string> fname, access _access) {
 		return move_data(file_buf(fname, _access));
@@ -43,7 +53,7 @@ namespace core {
 
 	logger::logger()
 	: _sink() {
-		assert(_instance == nullptr);
+		JOLLY_CORE_ASSERT(_instance == nullptr);
 		_sink = ptr_create<stdout_sink>().cast<sink>();
 	}
 
