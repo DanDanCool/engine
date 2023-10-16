@@ -7,7 +7,7 @@ namespace core {
 	template <typename T>
 	struct lock {
 		using type = T;
-		lock(ref<type> in) : _lock(in) {
+		lock(cref<type> in) : _lock(in) {
 			_lock.acquire();
 		}
 
@@ -15,7 +15,7 @@ namespace core {
 			_lock.release();
 		}
 
-		ref<type> _lock;
+		cref<type> _lock;
 	};
 
 	struct mutex {
@@ -25,9 +25,9 @@ namespace core {
 
 		ref<mutex> operator=(mutex&& other);
 
-		bool tryacquire();
-		void acquire();
-		void release();
+		bool tryacquire() const;
+		void acquire() const;
+		void release() const;
 
 		ptr<void> handle;
 	};
@@ -39,9 +39,9 @@ namespace core {
 
 		ref<semaphore> operator=(semaphore&& other);
 
-		bool tryacquire();
-		void acquire();
-		void release();
+		bool tryacquire() const;
+		void acquire() const;
+		void release() const;
 
 		ptr<void> handle;
 	};

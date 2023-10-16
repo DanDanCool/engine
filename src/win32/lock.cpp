@@ -26,16 +26,16 @@ namespace core {
 		return *this;
 	}
 
-	bool mutex::tryacquire() {
+	bool mutex::tryacquire() const {
 		DWORD res = WaitForSingleObject((HANDLE)handle.data, 0);
 		return res == WAIT_TIMEOUT ? false : true;
 	}
 
-	void mutex::acquire() {
+	void mutex::acquire() const {
 		WaitForSingleObject((HANDLE)handle.data, INFINITE);
 	}
 
-	void mutex::release() {
+	void mutex::release() const {
 		ReleaseMutex((HANDLE)handle.data);
 	}
 
@@ -61,16 +61,16 @@ namespace core {
 		return *this;
 	}
 
-	bool semaphore::tryacquire() {
+	bool semaphore::tryacquire() const {
 		DWORD res = WaitForSingleObject((HANDLE)handle.data, 0);
 		return res == WAIT_TIMEOUT ? false : true;
 	}
 
-	void semaphore::acquire() {
+	void semaphore::acquire() const {
 		WaitForSingleObject((HANDLE)handle.data, INFINITE);
 	}
 
-	void semaphore::release() {
+	void semaphore::release() const {
 		ReleaseSemaphore((HANDLE)handle.data, 1, NULL);
 	}
 }

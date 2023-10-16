@@ -18,13 +18,13 @@ namespace jolly {
 
 	void engine::add(cref<core::string> name, core::ptr<system> sys) {
 		core::lock lock(_lock);
-		ref<system> s = sys.ref();
+		auto& s = sys.get();
 		_systems[name] = sys;
 		s.init();
 	}
 
 	ref<system> engine::get(cref<core::string> name) {
-		return _systems[name].ref();
+		return _systems[name].get();
 	}
 
 	void engine::run() {

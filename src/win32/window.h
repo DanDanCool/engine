@@ -11,10 +11,12 @@
 
 namespace jolly {
 	enum class win_event {
-		close,
+		close = 0,
 		destroy,
 		create,
 		resize,
+
+		max_event_size
 	};
 
 	struct window;
@@ -53,7 +55,7 @@ namespace jolly {
 		core::ptr<void> handle;
 		core::ptr<vk_surface> surface; // stores rendering device info
 		core::table<u32, core::ptr<void>> windows;
-		core::table<win_event, core::vector<pfn_win_cb>> callbacks;
+		core::vector<core::vector<pfn_win_cb>> callbacks;
 		core::mutex busy;
 	};
 

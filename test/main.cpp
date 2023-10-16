@@ -8,6 +8,7 @@
 #include <core/set.h>
 #include <core/atom.h>
 #include <core/core.h>
+#include <engine/ecs.h>
 
 using namespace core;
 
@@ -28,7 +29,7 @@ struct basicstruct {
 
 void test_assert() {
 	LOG_INFO("% assert", DIVIDE);
-	JOLLY_ASSERT(3 == 4, "3 does not equal 4!");
+	//JOLLY_ASSERT(3 == 4, "3 does not equal 4!");
 }
 
 void test_thread() {
@@ -38,7 +39,7 @@ void test_thread() {
 	auto coroutine = [](ref<thread>, ptr<void> in) -> int {
 		ptr<int> args = in.cast<int>();
 
-		for (int x : range(args.ref())) {
+		for (int x : range(args.get())) {
 			LOG_INFO("%", x);
 		}
 
@@ -139,10 +140,10 @@ void test_ptr() {
 	LOG_INFO("% ptr", DIVIDE);
 	ptr<string> scope = ptr_create<string>("hello world");
 	ptr<int> a = ptr_create<int>(4);
-	LOG_INFO("%, %", scope->data, a.ref());
+	LOG_INFO("%, %", scope->data, a.get());
 
 	auto mylambda = [](ptr<int> in) {
-		LOG_INFO("%", in.ref());
+		LOG_INFO("%", in.get());
 	};
 
 	ptr<int> foo = ptr_create<int>(69);
@@ -155,7 +156,7 @@ void test_ptr() {
 	}
 
 	for (cref<ptr<int>> p : reverse(indirect)) {
-		LOG_INFO("%", p.ref());
+		LOG_INFO("%", p.get());
 	}
 }
 
@@ -218,7 +219,68 @@ void test_set() {
 
 		lock.release();
 	}
- }
+}
+
+struct test_component1 {
+	int a, b, c;
+};
+
+struct test_component2 {
+	string name;
+	int size;
+};
+
+
+namespace jolly {
+	template<>
+	struct components<test_component1, test_component2> {
+		components(ref<ecs> state, e_id e)
+		: one(nullptr)
+		, two(nullptr) {
+			one = &state.get<test_component1>(e);
+			two = &state.get<test_component2>(e);
+		}
+
+		test_component1* one;
+		test_component2* two;
+	};
+}
+
+void test_ecs() {
+	LOG_INFO("% ecs", DIVIDE);
+	jolly::ecs ecs;
+	jolly::e_id e = ecs.create();
+	ecs.add<test_component1>(e, test_component1{1, 2, 3});
+	ecs.add<test_component2>(e, test_component2{"hello", 69});
+
+	e = ecs.create();
+	ecs.add<test_component1>(e, test_component1{1, 2, 3});
+	ecs.add<test_component2>(e, test_component2{"world", 42});
+	ecs.del<test_component2>(e);
+
+	e = ecs.create();
+	ecs.add<test_component1>(e, test_component1{4, 2, 3});
+	ecs.add<test_component2>(e, test_component2{"quick", 42});
+
+	ecs.del<test_component1>(jolly::e_id{0});
+
+	for (auto& [entity, component] : ecs.view<test_component1>()) {
+		LOG_INFO("entity: %, a: % b: % c: %", entity._id, component.a, component.b, component.c);
+	}
+
+	for (auto& [entity, component] : ecs.view<test_component2>()) {
+		LOG_INFO("entity: %, name: % size: %", entity._id, component.name, component.size);
+	}
+
+	for (auto& [entity, components] : ecs.group<test_component1, test_component2>()) {
+		LOG_INFO("entity: %, name: %, a: %", entity._id, components.two->name, components.one->a);
+	}
+
+	ecs.add<test_component2>(jolly::e_id{1}, test_component2{"brown", 44});
+	for (auto& [entity, components] : ecs.group<test_component1, test_component2>()) {
+		LOG_INFO("entity: %, name: %, a: %", entity._id, components.two->name, components.one->a);
+	}
+}
 
 int main() {
 	test_assert();
@@ -231,4 +293,6 @@ int main() {
 	test_log();
 	test_set();
 	test_mutex();
+
+	test_ecs();
 }

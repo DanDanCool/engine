@@ -514,7 +514,7 @@ namespace jolly {
 		vkCreateGraphicsPipelines(gpu.device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &_pipeline.pipeline);
 
 		for (u32 id : _window->windows.keys()) {
-			vk_framebuffer_create_cb(_window.ref(), id, win_event::create);
+			vk_framebuffer_create_cb(_window.get(), id, win_event::create);
 		}
 
 		_window->add_cb(win_event::create, vk_framebuffer_create_cb);
@@ -645,7 +645,7 @@ namespace jolly {
 		_window->step(ms);
 
 		auto& gpu = main_gpu();
-		auto& surface = _window->surface.ref();
+		auto& surface = _window->surface.get();
 
 		vkWaitForFences(gpu.device, 1, &surface.fences[_frame], VK_TRUE, U64_MAX);
 

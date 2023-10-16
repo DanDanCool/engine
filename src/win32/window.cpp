@@ -40,7 +40,7 @@ namespace jolly {
 	: handle()
 	, surface()
 	, windows()
-	, callbacks()
+	, callbacks((u32)win_event::max_event_size)
 	, busy() {
 		handle = (void*)GetModuleHandle(NULL);
 
@@ -127,7 +127,7 @@ namespace jolly {
 		surface = core::ptr_create<vk_surface>(device);
 
 		auto create_cb = [](ref<window> state, u32 id, win_event event) {
-			ref<vk_surface> surface = state.surface.ref();
+			ref<vk_surface> surface = state.surface.get();
 
 			VkSurfaceKHR tmp = VK_NULL_HANDLE;
 			VkWin32SurfaceCreateInfoKHR info{};
@@ -142,7 +142,7 @@ namespace jolly {
 		};
 
 		auto close_cb = [](ref<window> state, u32 id, win_event event) {
-			ref<vk_surface> surface = state.surface.ref();
+			ref<vk_surface> surface = state.surface.get();
 			auto& gpu = surface.device.main_gpu();
 			ref<vk_swapchain> swapchain = surface.surfaces[id];
 
@@ -175,7 +175,7 @@ namespace jolly {
 	}
 
 	void window::vk_term() {
-		ref<vk_surface> _surface = surface.ref();
+		ref<vk_surface> _surface = surface.get();
 		auto& gpu = _surface.device.main_gpu();
 
 		for (i32 i : core::range(MAX_FRAMES_IN_FLIGHT)) {
@@ -185,7 +185,7 @@ namespace jolly {
 
 	void window::vk_swapchain_create() {
 		auto create_cb = [](ref<window> state, u32 id, win_event event) {
-			auto& surface = state.surface.ref();
+			auto& surface = state.surface.get();
 			auto& gpu = surface.device.main_gpu();
 			auto& swapchain = surface.surfaces[id];
 
@@ -201,7 +201,7 @@ namespace jolly {
 		};
 
 		auto resize_cb = [](ref<window> state, u32 id, win_event event) {
-			auto& surface = state.surface.ref();
+			auto& surface = state.surface.get();
 			auto& gpu = surface.device.main_gpu();
 			auto& swapchain = surface.surfaces[id];
 			if (!swapchain.busy.tryacquire()) {
@@ -228,7 +228,7 @@ namespace jolly {
 			swapchain.busy.release();
 		};
 
-		auto& _surface = surface.ref();
+		auto& _surface = surface.get();
 		auto& gpu = _surface.device.main_gpu();
 		VkFenceCreateInfo fence_info{};
 		fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -246,7 +246,7 @@ namespace jolly {
 	}
 
 	ref<vk_swapchain> window::vk_main_swapchain() const {
-		auto& _surface = surface.ref();
+		auto& _surface = surface.get();
 		return _surface.surfaces._vals[0];
 	}
 
@@ -281,6 +281,13 @@ namespace jolly {
 
 	math::vec2i window::size(u32 id) const {
 		RECT area{};
+		HWND hwnd = nullptr;
+
+		{
+			core::lock lock(busy);
+			hwnd = (HWND)windows[id].data;
+		}
+
 		GetClientRect((HWND)windows[id].data, &area);
 		return math::vec2i{area.right, area.bottom};
 	}
@@ -290,15 +297,15 @@ namespace jolly {
 	}
 
 	void window::callback(u32 id, win_event event) {
-		if (!callbacks.has(event)) return;
 		core::lock lock(busy);
-		for (auto cb : callbacks[event]) {
+		for (auto cb : callbacks[(u32)event]) {
 			cb(*this, id, event);
 		}
 	}
 
 	void window::add_cb(win_event event, pfn_win_cb cb) {
-		auto& vec = callbacks[event];
+		core::lock lock(busy);
+		auto& vec = callbacks[(u32)event];
 		if (!vec.data) {
 			vec = core::vector<pfn_win_cb>(0);
 		}
@@ -307,7 +314,7 @@ namespace jolly {
 	}
 
 	void vk_swapchain_create_cb(ref<window> state, u32 id, win_event event) {
-		auto& surface = state.surface.ref();
+		auto& surface = state.surface.get();
 		auto& gpu = surface.device.main_gpu();
 		auto& swapchain = surface.surfaces[id];
 
@@ -412,7 +419,7 @@ namespace jolly {
 	}
 
 	void vk_framebuffer_create_cb(ref<window> state, u32 id, win_event event) {
-		auto& surface = state.surface.ref();
+		auto& surface = state.surface.get();
 		auto& swapchain = surface.surfaces[id];
 		auto& gpu = surface.device.main_gpu();
 		swapchain.framebuffers = core::vector<VkFramebuffer>(swapchain.views.size);
@@ -437,7 +444,7 @@ namespace jolly {
 	}
 
 	void vk_swapchain_destroy_cb(ref<window> state, u32 id, win_event event) {
-		ref<vk_surface> surface = state.surface.ref();
+		ref<vk_surface> surface = state.surface.get();
 		auto& gpu = surface.device.main_gpu();
 		ref<vk_swapchain> swapchain = surface.surfaces[id];
 

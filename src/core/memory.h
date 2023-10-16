@@ -116,7 +116,7 @@ namespace core {
 		using ptr_base::ptr_base;
 		using type = T;
 
-		ref<type> ref() const {
+		ref<type> get() const {
 			return *ptr_base::data;
 		}
 	};
@@ -126,7 +126,7 @@ namespace core {
 		using ptr_base::ptr_base;
 
 		template<typename S>
-		ref<S> ref() const {
+		ref<S> get() const {
 			return *(S*)ptr_base::data;
 		}
 	};
@@ -171,8 +171,8 @@ namespace core {
 		}
 
 		template <typename T>
-		ref<T> ref() const {
-			return data.ref<T>();
+		ref<T> get() const {
+			return data.get<T>();
 		}
 
 		template<typename T>
