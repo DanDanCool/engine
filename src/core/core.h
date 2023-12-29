@@ -89,11 +89,11 @@ u8* bytes(cref<T> val) {
 
 #define ENUM_CLASS_OPERATORS(enum) \
 	enum operator|(enum a, enum b) { \
-		i64 res = (i64)a | (i64)b; \
+		u64 res = (u64)a | (u64)b; \
 		return (enum)res; \
 	} \
 	enum operator&(enum a, enum b) { \
-		i64 res = (i64)a & (i64)b; \
+		u64 res = (u64)a & (u64)b; \
 		return (enum)res; \
 	} \
 
@@ -145,3 +145,11 @@ namespace assert {
 	if (!(expr)) { \
 		JOLLY_DEBUG_BREAK(); \
 	}
+
+#define LOG_INFO(...) core::logger::instance().info(core::format_string(__VA_ARGS__))
+#define LOG_WARN(...) core::logger::instance().warn(core::format_string(__VA_ARGS__))
+#define LOG_CRIT(...) core::logger::instance().crit(core::format_string(__VA_ARGS__))
+
+#define move_data(...) static_cast<core::raw_type_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
+#define forward_data(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
+

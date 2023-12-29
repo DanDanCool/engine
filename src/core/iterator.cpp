@@ -1,8 +1,10 @@
-#pragma once
+module;
 
 #include "core.h"
 
-namespace core {
+export module core.iterator;
+
+export namespace core {
 	template <typename T>
 	struct view_base {
 		using container = T;
@@ -44,22 +46,23 @@ namespace core {
 		range(u32 beg, u32 end, u32 inc) : _beg(beg), _end(end), _inc(inc) {}
 
 		struct iterator {
-			iterator(u32 _idx, u32 _inc) : idx(_idx), inc(_inc) {}
+			iterator(u32 idx, u32 inc)
+			: index(_idx), increment(_inc) {}
 
 			iterator& operator++() {
-				idx += inc;
+				index += increment;
 				return *this;
 			}
 
 			bool operator !=(cref<iterator> other) const {
-				return idx != other.idx;
+				return index != other.index;
 			}
 
 			i32 operator*() const {
-				return idx;
+				return index;
 			}
 
-			i32 idx, inc;
+			i32 index, increment;
 		};
 
 		iterator begin() {
@@ -71,5 +74,10 @@ namespace core {
 		}
 
 		i32 _beg, _end, _inc;
+	};
+
+	// python style enumerate
+	struct enumerate {
+
 	};
 }

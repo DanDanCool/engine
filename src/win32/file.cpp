@@ -1,12 +1,14 @@
-#include <core/file.h>
+module;
 
+#include <core/core.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <io.h>
 #include <stdio.h>
 
+module core.file;
+
 namespace core {
-	ENUM_CLASS_OPERATORS(access);
 	static int convert_flags(access _access);
 	static int get_fd(cref<ptr<void>> handle);
 
@@ -31,11 +33,6 @@ namespace core {
 		handle = nullptr;
 	}
 
-	ref<file> file::operator=(file&& other) {
-		handle = other.handle;
-		return *this;
-	}
-
 	u32 file::write(memptr buf) {
 		int fd = get_fd(handle);
 		int bytes = _write(fd, buf.data, (u32)buf.size);
@@ -56,57 +53,9 @@ namespace core {
 		return move_data(buffer);
 	}
 
-	u32 file::read(ref<buffer> buf) {
-		int fd = get_fd(handle);
-		int bytes = _read(fd, buf.data + buf.index, (u32)(buffer::size - buf.index));
-		buf.index += bytes;
-		return bytes;
-	}
-
 	void file::flush() {
 		int fd = get_fd(handle);
 		_commit(fd);
-	}
-
-	file_buf::file_buf(cref<string> fname, access _access)
-	: file(fname, _access), data() {}
-
-	file_buf::file_buf(file_buf&& other)
-	: file() {
-		*this = move_data(other);
-	}
-
-	ref<file_buf> file_buf::operator=(file_buf&& other) {
-		file::operator=(move_data(other));
-		data.data = other.data.data;
-		data.index = other.data.index;
-
-		return *this;
-	}
-
-	u32 file_buf::write(memptr buf) {
-		u64 bytes = buf.size;
-		buf = data.write(buf);
-		bytes -= buf.size;
-
-		while (buf.size) {
-			u32 tmp = file::write(memptr{ data.data, data.index });
-			if (!tmp) return (u32)bytes;
-			bytes += tmp;
-
-			data.flush();
-			buf = data.write(buf);
-		}
-
-		return (u32)bytes;
-	}
-
-	u32 file_buf::read(ref<buffer> buf){
-		return file::read(buf);
-	}
-
-	vector<u8> file_buf::read() {
-		return move_data(file::read());
 	}
 
 	static int convert_flags(access _access) {

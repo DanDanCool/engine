@@ -1,0 +1,26 @@
+# this is a comment
+myarray = [ 4, 5, 6, 7 ]
+
+# this is a table
+mydict = {
+	a = 4,
+	b = 5,
+	inner = {
+		d = 3,
+		myval = 4
+	}
+}
+
+# this is a boolean
+myboolean = true
+
+mystring = "hello world"
+
+myfloat = 4.0
+
+mysigned = -3
+
+thisvalue = myfloat * 4
+
+# allows for basic expression evaluation
+myeval = myfloat * (mysigned + 2)

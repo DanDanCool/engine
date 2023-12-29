@@ -1,28 +1,52 @@
-#include "system.h"
+module;
 
-#include <core/memory.h>
+#include <core/core.h>
 
-namespace jolly {
-	void system_thread::init() {
-		auto start = [](ref<core::thread> _, core::ptr<void> args) {
-			core::ptr<system_thread> sys = args.cast<system_thread>();
-			sys->run();
-			sys = nullptr;
-			return 0;
-		};
+export module jolly.system;
+import core.thread;
+import core.memory;
 
-		thread = core::thread(start, core::ptr<void>((void*)this));
-	}
+export namespace jolly {
+	struct system {
+		virtual ~system() = default;
 
-	void system_thread::term() {
-		thread.join();
-	}
+		virtual void init() = 0;
+		virtual void term() = 0;
 
-	void system_thread::yield() {
-		thread.yield();
-	}
+		virtual void step(f32 ms) = 0;
+	};
 
-	void system_thread::sleep(int ms) {
-		thread.sleep(ms);
-	}
+	struct system_thread : public system {
+		system_thread() = default;
+		virtual ~system_thread() = default;
+
+		virtual void init() {
+			auto start = [](ref<core::thread> _, core::ptr<void> args) {
+				auto sys = args.cast<system_thread>();
+				sys->run();
+				sys = nullptr;
+				return 0;
+			};
+
+			thread = core::thread(start, core::ptr<void>((void*)this));
+		}
+
+		virtual void system_thread::term() {
+			thread.join();
+		}
+
+		void yield();
+
+		void system_thread::yield() {
+			thread.yield();
+		}
+
+		void system_thread::sleep(int ms) {
+			thread.sleep(ms);
+		}
+
+		virtual void run() = 0;
+
+		core::thread thread;
+	};
 }

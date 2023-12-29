@@ -1,11 +1,13 @@
-#pragma once
+module;
 
 #include "core.h"
-#include "simd.h"
-#include "memory.h"
-#include "operations.h"
 
-namespace core {
+export module core.string;
+import core.memory;
+import core.simd;
+import core.operations;
+
+export namespace core {
 	template<typename T>
 	struct string_base {
 		using type = T;
@@ -19,11 +21,6 @@ namespace core {
 		string_base(type* str, u64 size)
 		: data(str), size(size) {}
 
-		string_base(cref<string_base> other)
-		: data(nullptr), size(0) {
-			*this = other;
-		}
-
 		string_base(string_base&& other)
 		: data(nullptr), size(0) {
 			*this = other;
@@ -32,15 +29,6 @@ namespace core {
 		~string_base() {
 			if (!data) return;
 			free256((void*)data);
-		}
-
-		ref<string_base> operator=(cref<string_base> other) {
-			u32 bytes = (u32)((other.size + 1) * sizeof(type));
-			memptr ptr = alloc256(bytes);
-			copy256((u8*)other.data, ptr.data, align_size256(bytes));
-			data = (type*)ptr.data;
-			size = other.size;
-			return *this;
 		}
 
 		ref<string_base> operator=(string_base&& other) {
@@ -85,23 +73,7 @@ namespace core {
 
 		bool operator==(cref<string_base> other) const {
 			if (size != other.size) return false;
-
-			u32 count = align_size256((u32)size) / BLOCK_32;
-			u8* a = (u8*)data;
-			u8* b = (u8*)other.data;
-			for (u32 i = 0; i < count; i++) {
-				__m256i x = _mm256_load_si256((__m256i*)a);
-				__m256i y = _mm256_load_si256((__m256i*)b);
-
-				__m256i z = _mm256_cmpeq_epi8(x, y);
-				int equal = _mm256_testc_si256(z, z);
-				if (!equal) return false;
-
-				a += BLOCK_32;
-				b += BLOCK_32;
-			}
-
-			return true;
+			return cmp256((u8*)data, (u8*)other.data, align_size256((u32)size));
 		}
 
 		operator type*() const {
@@ -110,6 +82,13 @@ namespace core {
 
 		operator memptr() const {
 			return memptr{ (u8*)data, size * sizeof(type) };
+		}
+
+		string_base copy() {
+			u32 bytes = (u32)((size + 1) * sizeof(type));
+			memptr ptr = alloc256(bytes);
+			copy256((u8*)data, ptr.data, align_size256(bytes));
+			return move_data(string_base((type*)data, size));
 		}
 
 		struct iterator_base {
@@ -163,11 +142,20 @@ namespace core {
 	};
 
 	template <typename T>
-		struct hash_info<string_base<T>> {
-			static u32 hash(cref<string_base<T>> key) {
-				return fnv1a((u8*)key.data, (u32)(key.size * sizeof(T)));
-			}
-		};
+	struct string_view_base {
+		using type = T;
+
+		type* data;
+		u64 size;
+	};
+
+	template <typename T>
+	struct hash_info<string_base<T>> {
+		static u32 hash(cref<string_base<T>> key) {
+			return fnv1a((u8*)key.data, (u32)(key.size * sizeof(T)));
+		}
+	};
 
 	typedef string_base<i8> string;
+	typedef string_view_base<i8> string_view;
 };

@@ -1,6 +1,8 @@
-#include "atom.h"
+module;
 
 #include <intrin.h>
+
+module core.atom;
 
 #define ATOMIC_LOAD_X86_IMPL(type, obj) \
 	type val = obj.data; \
@@ -8,6 +10,47 @@
 
 #define ATOMIC_STORE_X86_IMPL(type, obj, data) \
 	obj.data = data
+
+#define ADD_OP_i8(obj, arg) \
+	static_assert(sizeof(obj.data) == sizeof(i8)); \
+	i8 tmp = _InterlockedExchangeAdd8((i8*)&obj.data, arg)
+
+#define ADD_OP_i16(obj, arg) \
+	static_assert(sizeof(obj.data) == sizeof(i16)); \
+	i16 tmp = _InterlockedExchangeAdd16((i16*)&obj.data, arg)
+
+#define ADD_OP_i32(obj, arg) \
+	static_assert(sizeof(obj.data) == sizeof(i32)); \
+	i32 tmp = _InterlockedExchangeAdd((i32*)&obj.data, arg)
+
+#define ADD_OP_i64(obj, arg) \
+	static_assert(sizeof(obj.data) == sizeof(i8)); \
+	i8 tmp = _InterlockedExchangeAdd8((i8*)&obj.data, arg)
+
+#define ADD_OP_u8(obj, arg) ADD_OP_i8(obj, arg)
+#define ADD_OP_u16(obj, arg) ADD_OP_i16(obj, arg)
+#define ADD_OP_u32(obj, arg) ADD_OP_i32(obj, arg)
+#define ADD_OP_u64(obj, arg) ADD_OP_i64(obj, arg)
+
+#define ADD_OP(type, obj, arg) CAT(ADD_OP_, type)(obj, arg)
+
+#define ATOMIC_ADD_X86_IMPL(type, obj, arg) \
+	ADD_OP(type, obj, arg);
+
+#define SUB_OP_i8(obj, arg) ADD_OP_i8(obj, -arg)
+#define SUB_OP_i16(obj, arg) ADD_OP_i16(obj, -arg)
+#define SUB_OP_i32(obj, arg) ADD_OP_i32(obj, -arg)
+#define SUB_OP_i64(obj, arg) ADD_OP_i64(obj, -arg)
+
+#define SUB_OP_u8(obj, arg)	ADD_OP_i8(obj, -(i8)arg)
+#define SUB_OP_u16(obj, arg) ADD_OP_i16(obj, -(i16)arg)
+#define SUB_OP_u32(obj, arg) ADD_OP_i32(obj, -(i32)arg)
+#define SUB_OP_u64(obj, arg) ADD_OP_i64(obj, -(i64)arg)
+
+#define SUB_OP(type, obj, arg) CAT(SUB_OP_, type)(obj, arg)
+
+#define ATOMIC_SUB_X86_IMPL(type, obj, arg) \
+	SUB_OP(type, obj, arg);
 
 // for some reason the _np version does not exist for i8
 #define CMPXCHG_OP_i8(obj, expected, desired) \
@@ -55,6 +98,22 @@ template<> void atomic_store<type, _memory_order_release>(ref<atom_base<type>> o
 	ATOMIC_STORE_X86_IMPL(type, obj, data); \
 } \
 
+#define ATOMIC_ADD_IMPL(type) \
+template<> void atomic_add<type, _memory_order_relaxed>(ref<atom_base<type>> obj, type arg) { \
+	ATOMIC_ADD_X86_IMPL(type, obj, arg); \
+} \
+template<> void atomic_add<type, _memory_order_release>(ref<atom_base<type>> obj, type arg) { \
+	ATOMIC_ADD_X86_IMPL(type, obj, arg); \
+} \
+
+#define ATOMIC_SUB_IMPL(type) \
+template<> void atomic_sub<type, _memory_order_relaxed>(ref<atom_base<type>> obj, type arg) { \
+	ATOMIC_SUB_X86_IMPL(type, obj, arg); \
+} \
+template<> void atomic_sub<type, _memory_order_release>(ref<atom_base<type>> obj, type arg) { \
+	ATOMIC_SUB_X86_IMPL(type, obj, arg); \
+} \
+
 #define ATOMIC_CMPXCHG_IMPL(type) \
 template<> bool atomic_cmpxchg<type, _memory_order_relaxed, _memory_order_relaxed>(ref<atom_base<type>> obj, ref<type> expected, type desired) { \
 	ATOMIC_CMPXCHG_X86_IMPL(type, obj, expected, desired); \
@@ -89,6 +148,24 @@ namespace core {
 	ATOMIC_STORE_IMPL(u32);
 	ATOMIC_STORE_IMPL(u64);
 	ATOMIC_STORE_IMPL(bool);
+
+	ATOMIC_ADD_IMPL(i8);
+	ATOMIC_ADD_IMPL(i16);
+	ATOMIC_ADD_IMPL(i32);
+	ATOMIC_ADD_IMPL(i64);
+	ATOMIC_ADD_IMPL(u8);
+	ATOMIC_ADD_IMPL(u16);
+	ATOMIC_ADD_IMPL(u32);
+	ATOMIC_ADD_IMPL(u64);
+
+	ATOMIC_SUB_IMPL(i8);
+	ATOMIC_SUB_IMPL(i16);
+	ATOMIC_SUB_IMPL(i32);
+	ATOMIC_SUB_IMPL(i64);
+	ATOMIC_SUB_IMPL(u8);
+	ATOMIC_SUB_IMPL(u16);
+	ATOMIC_SUB_IMPL(u32);
+	ATOMIC_SUB_IMPL(u64);
 
 	ATOMIC_CMPXCHG_IMPL(i8);
 	ATOMIC_CMPXCHG_IMPL(i16);

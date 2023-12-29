@@ -1,14 +1,15 @@
-#include <core/vector.h>
-#include <core/memory.h>
-#include <core/string.h>
-#include <core/table.h>
-#include <core/thread.h>
-#include <core/lock.h>
-#include <core/log.h>
-#include <core/set.h>
-#include <core/atom.h>
 #include <core/core.h>
-#include <engine/ecs.h>
+
+import core.vector;
+import core.memory;
+import core.string;
+import core.table;
+import core.thread;
+import core.lock;
+import core.log;
+import core.set;
+import core.atom;
+import jolly.ecs;
 
 using namespace core;
 

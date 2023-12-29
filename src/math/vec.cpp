@@ -1,6 +1,8 @@
-#pragma once
+module;
 
 #include <core/core.h>
+
+export module math.vec;
 
 namespace math {
 	template <typename T>

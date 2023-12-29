@@ -1,19 +1,31 @@
-#pragma once
+module;
 
-#include "memory.h"
+#include "core.h"
 
-namespace core {
+export module core.thread;
+import core.memory;
+
+export namespace core {
 	struct thread;
 	typedef int (*pfn_thread)(ref<thread>, ptr<void> args);
 
 	struct _threadargs {
-		_threadargs(pfn_thread instart, ref<thread> inthread, ptr<void> inargs);
-		_threadargs(cref<_threadargs> other);
+		_threadargs(pfn_thread instart, ref<thread> inthread, ptr<void> inargs)
+		: _start(instart), _thread(inthread), _args(inargs) {}
+			_threadargs(cref<_threadargs> other);
+
+		_threadargs(cref<_threadargs> other)
+		: _start(other._start), _thread(other._thread), _args(other._args) {}
 
 		pfn_thread _start;
 		ref<thread> _thread;
 		ptr<void> _args;
 	};
+
+	ref<thread> thread::operator=(cref<thread> other) {
+		handle = other.handle;
+		return *this;
+	}
 
 	struct thread {
 		thread() = default;

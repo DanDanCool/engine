@@ -1,12 +1,12 @@
-#pragma once
-
-#include "iterator.h"
+module;
 
 #include <initializer_list>
 
-namespace core {
-	u32 table_size(u32 sz);
+export module core.set;
+import core.iterator;
+import core.table;
 
+namespace core {
 	template <typename T>
 	struct set {
 		using type = T;
@@ -129,28 +129,28 @@ namespace core {
 		}
 
 		struct iterator {
-			iterator(cref<vector<type>> _keys, cref<vector<u32>> _hash, u32 _idx)
-				: keys(_keys), hash(_hash), idx(_idx) {}
+			iterator(cref<vector<type>> _keys, cref<vector<u32>> _hash, u32 idx)
+				: keys(_keys), hash(_hash), index(idx) {}
 
 			ref<iterator> operator++() {
-				for (u32 i : range(idx + 1, hash.reserve)) {
-					idx = i;
-					if (hash[idx]) break;
+				for (u32 i : range(index + 1, hash.reserve)) {
+					index = i;
+					if (hash[index]) break;
 				}
 				return *this;
 			}
 
 			bool operator!=(cref<iterator> other) const {
-				return idx != other.idx;
+				return index != other.index;
 			}
 
 			ref<type> operator*() const {
-				return keys[idx];
+				return keys[index];
 			}
 
 			cref<vector<type>> keys;
 			cref<vector<u32>> hash;
-			u32 idx;
+			u32 index;
 		};
 
 		auto begin() {

@@ -26,14 +26,14 @@ test.include(jmake.fullpath('src'))
 debug = test.filter("debug")
 debug["debug"] = True
 
-host = jmake.Host()
+host = jmake.Env()
 if host.os == jmake.Platform.WIN32:
     engine.define('JOLLY_WIN32', 1)
     engine.define('WIN32_LEAN_AND_MEAN', 1)
     test.define('JOLLY_WIN32', 1)
     test.define('WIN32_LEAN_AND_MEAN', 1)
 
-vulkan = jmake.package("vulkan")
+vulkan = jmake.package("builtin/vulkan")
 engine.depend(vulkan)
 test.depend(vulkan)
 

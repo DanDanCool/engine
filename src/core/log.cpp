@@ -1,27 +1,150 @@
-#include "log.h"
+module;
 
-#include "file.h"
-#include "lock.h"
-
+#include "core.h"
 #include <cstdio>
+
+export module core.log;
+
+import core.string;
+import core.tuple;
+import core.memory;
+import core.iterator;
+import core.file;
+import core.lock;
 
 #define FORMAT_INT(type) \
 template<> void format<type>(cref<type> arg, ref<fmtbuf> buf) { format<i64>((i64)arg, buf); }
 
-namespace assert {
-	cstr message(cstr msg) {
-		return msg;
+export namespace core {
+	using fmtbuf = buffer_base<BLOCK_1024>;
+	template <typename T>
+	void format(cref<T> arg, ref<fmtbuf> buf);
+
+	template <u32 N>
+	void format(const char (&arg)[N], ref<fmtbuf> buf) {
+		for (int i : range(N)) {
+			if (!arg[i]) return;
+			buf.write((u8)arg[i]);
+		}
 	}
 
-	void callback(cstr expr, cstr file, int line, cstr message) {
-		LOG_CRIT("% failed! in file: %, line: %\n%", expr, file, line, message);
-	}
-}
+	struct format_string {
+		using iterator = string::forward_iterator;
 
-namespace core {
-	file_buf fopen(cref<string> fname, access _access) {
-		return move_data(file_buf(fname, _access));
-	}
+		template <typename... Args>
+		format_string(cref<string> fmt, Args&&... args)
+		: data(), buf(), beg(fmt.begin()), end(fmt.end()) {
+			swallow(_format(args)...);
+			_format();
+		}
+
+		~format_string() {
+			// consider setting data to null to prevent destruction
+		}
+
+		ref<format_string> operator=(cref<format_string> other) {
+			data = other.data;
+		}
+
+		template <typename T>
+		int _format(cref<T> arg) {
+			while (beg != end) {
+				if (*beg == '%') {
+					++beg;
+					break;
+				}
+
+				buf.write((u8)*beg);
+				++beg;
+			}
+
+			format(arg, buf);
+			return 0;
+		}
+
+		void _format() {
+			while (beg != end) {
+				buf.write((u8)*beg);
+				++beg;
+			}
+
+			buf.data[fmtbuf::size - 1] = 0;
+			data = string((i8*)buf.data, buf.index);
+			buf.data = nullptr;
+		}
+
+		string data;
+		fmtbuf buf;
+		iterator beg, end;
+	};
+
+	struct sink;
+	struct logger {
+		enum class severity {
+			info, warn, crit
+		};
+
+		logger()
+		: _sink() {
+			JOLLY_CORE_ASSERT(_instance == nullptr);
+			_sink = ptr_create<stdout_sink>().cast<sink>();
+		}
+
+		~logger() {
+			_sink->flush();
+		}
+
+		void log(logger::severity level, cref<string> log) {
+			switch (level) {
+				case severity::info: {
+					const char data[] = "info: ";
+					_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+					break;
+									 }
+				case severity::warn: {
+					const char data[] = "warn: ";
+					_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+					break;
+									 }
+				case severity::crit: {
+					const char data[] = "crit: ";
+					_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+					break;
+				 }
+			}
+
+			_sink->write(log);
+
+			cstr newline = "\n";
+			_sink->write(memptr{ (u8*)newline, 1 });
+			_sink->flush();
+		}
+
+
+		inline void info(cref<format_string> fmt) {
+			log(severity::info, fmt.data);
+		}
+
+		inline void warn(cref<format_string> fmt) {
+			log(severity::warn, fmt.data);
+		}
+
+		inline void crit(cref<format_string> fmt) {
+			log(severity::crit, fmt.data);
+		}
+
+		static ref<logger> logger::instance() {
+			if (!_instance) {
+				_instance = ptr_create<logger>();
+			}
+
+			return *_instance;
+		}
+
+		ptr<sink> _sink;
+
+		static ptr<logger> _instance = nullptr;
+	};
 
 	struct sink {
 		sink() = default;
@@ -49,51 +172,6 @@ namespace core {
 		mutex _lock;
 	};
 
-	ptr<logger> logger::_instance = nullptr;
-
-	logger::logger()
-	: _sink() {
-		JOLLY_CORE_ASSERT(_instance == nullptr);
-		_sink = ptr_create<stdout_sink>().cast<sink>();
-	}
-
-	logger::~logger() {
-		_sink->flush();
-	}
-
-	void logger::log(logger::severity level, cref<string> log) {
-		switch (level) {
-			case severity::info: {
-				const char data[] = "info: ";
-				_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
-				break;
-								 }
-			case severity::warn: {
-				const char data[] = "warn: ";
-				_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
-				break;
-								 }
-			case severity::crit: {
-				const char data[] = "crit: ";
-				_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
-				break;
-								 }
-		}
-
-		_sink->write(log);
-
-		cstr newline = "\n";
-		_sink->write(memptr{ (u8*)newline, 1 });
-		_sink->flush();
-	}
-
-	ref<logger> logger::instance() {
-		if (!_instance) {
-			_instance = ptr_create<logger>();
-		}
-
-		return *_instance;
-	}
 
 	template<>
 	void format<string>(cref<string> arg, ref<fmtbuf> buf) {

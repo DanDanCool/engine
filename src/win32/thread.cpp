@@ -1,7 +1,10 @@
-#include <core/thread.h>
+module;
 
+#include <core/core.h>
 #include <windows.h>
 #include <process.h>
+
+module core.thread;
 
 namespace core {
 	static int __stdcall start_wrapper(void* in) {

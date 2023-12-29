@@ -1,25 +1,33 @@
-#pragma once
+module;
 
 #include "core.h"
 
-#define move_data(...) static_cast<core::raw_type_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
-#define forward_data(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
+export module core.traits;
 
-namespace core {
+export namespace core {
 	template <typename T, T val>
 	struct basic_constant {
 		using type = T;
 		static constexpr type value = val;
 	};
 
+	template <bool val>
+	using bool_constant = basic_constant<bool, val>;
+
+	template <i32 val>
+	using int_constant = basic_constant<i32, val>;
+
+	template <u32 val>
+	using uint_constant = basic_constant<u32, val>;
+
 	template <typename T>
-	struct is_destructible : public basic_constant<bool, __is_destructible(T)> {};
+	struct is_destructible : public bool_constant<__is_destructible(T)> {};
 
 	template <typename T>
 	inline constexpr bool is_destructible_v = is_destructible<T>::value;
 
 	template <typename T>
-	struct is_constructible : public basic_constant<bool, __is_constructible(T)> {};
+	struct is_constructible : public bool_constant<__is_constructible(T)> {};
 
 	template <typename T>
 	inline constexpr bool is_constructible_v = is_constructible<T>::value;
@@ -83,4 +91,8 @@ namespace core {
 	void destroy(T* data) {
 		_destroy<is_destructible_v<T>>::destroy<T>(data);
 	};
+
+	// hack to use pack expansion
+	template <typename... Ts>
+	void swallow(Ts&&...) {}
 }

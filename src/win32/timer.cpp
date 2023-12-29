@@ -1,11 +1,11 @@
-#include "timer.h"
+module;
 
 #include <windows.h>
 #include <profileapi.h>
 
-namespace core {
-	i64 timer::frequency = -1;
+module core.timer;
 
+namespace core {
 	timer::timer(ref<f32> res) : start(-1), result(res) {
 		if (frequency == -1) {
 			LARGE_INTEGER freq;

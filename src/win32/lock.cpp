@@ -1,7 +1,9 @@
-#include <core/lock.h>
+module;
 
 #include <windows.h>
 #include <process.h>
+
+module core.lock;
 
 namespace core {
 	mutex::mutex()
@@ -28,7 +30,7 @@ namespace core {
 
 	bool mutex::tryacquire() const {
 		DWORD res = WaitForSingleObject((HANDLE)handle.data, 0);
-		return res == WAIT_TIMEOUT ? false : true;
+		return !(res == WAIT_TIMEOUT);
 	}
 
 	void mutex::acquire() const {
@@ -63,7 +65,7 @@ namespace core {
 
 	bool semaphore::tryacquire() const {
 		DWORD res = WaitForSingleObject((HANDLE)handle.data, 0);
-		return res == WAIT_TIMEOUT ? false : true;
+		return !(res == WAIT_TIMEOUT);
 	}
 
 	void semaphore::acquire() const {
@@ -72,5 +74,64 @@ namespace core {
 
 	void semaphore::release() const {
 		ReleaseSemaphore((HANDLE)handle.data, 1, NULL);
+	}
+
+	rwlock::rwlock()
+	: handle() {
+		SRWLock* lock = (SRWLock*)alloc8((u32)sizeof(SRWLock));
+		InitializeSRWLock(lock);
+		handle = (void*)lock;
+	}
+
+	rwlock::rwlock(rwlock&& other)
+	: handle() {
+		*this = forward_data(other);
+	}
+
+	rwlock::~rwlock() {
+		if (!handle) return;
+		free8(handle.data);
+	}
+
+	ref<rwlock> rwlock::operator=(rwlock&& other) {
+		handle = forward_data(other.handle);
+		other.handle = nullptr;
+		return *this;
+	}
+
+	bool rwlock::tryracquire() const {
+		return TryAcquireSWRLockShared((SRWLock*)handle.data);
+	}
+
+	bool rwlock::trywacquire() const {
+		return TryAcquireSWRLockExclusive((SRWLock*)handle.data);
+	}
+
+	void rwlock::racquire() const {
+		AcquireSRWLockShared((SRWLock*)handle.data);
+	}
+
+	void rwlock::rrlease() const {
+		ReleaseSWRLockShared((SRWLock*)handle.data);
+	}
+
+	void rwlock::wacquire() const {
+		AcquireSRWLockExclusive((SRWLock*)handle.data);
+	}
+
+	void rwlock::wrelease() const {
+		ReleaseSRWLockExclusive((SWRLock*)handle.data);
+	}
+
+	bool rwlock::tryacquire() const {
+		return trywacquire();
+	}
+
+	void rwlock::acquire() const {
+		wacquire();
+	}
+
+	void rwlock::release() const {
+		wrelease();
 	}
 }

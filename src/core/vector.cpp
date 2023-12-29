@@ -1,18 +1,21 @@
-#pragma once
+module;
 
 #include "core.h"
-#include "traits.h"
-#include "memory.h"
-#include "iterator.h"
-#include "operations.h"
-
 #include <initializer_list>
 
+export module core.vector;
+import core.traits;
+import core.memory;
+import core.simd;
+import core.iterator;
+import core.operations;
+
 namespace core {
-	const u32 VECTOR_DEFAULT_SIZE = 32;
+	constexpr u32 VECTOR_DEFAULT_SIZE = BLOCK_32;
 	template<typename T>
 	struct vector {
 		using type = T;
+		using this_type = vector<type>;
 
 		vector() = default;
 		vector(u32 sz)
@@ -20,14 +23,9 @@ namespace core {
 			_allocate(sz);
 		}
 
-		vector(vector<type>&& other)
+		vector(this_type&& other)
 		: data(nullptr), reserve(0), size(0) {
-			*this = other;
-		}
-
-		vector(cref<vector<type>>& other)
-		: data(nullptr), reserve(0), size(0) {
-			*this = other;
+			*this = move_data(other);
 		}
 
 		vector(std::initializer_list<type> l)
@@ -40,7 +38,7 @@ namespace core {
 			destroy();
 		}
 
-		ref<vector<type>> operator=(vector<type>&& other) {
+		ref<this_type> operator=(this_type&& other) {
 			data = other.data;
 			reserve = other.reserve;
 			size = other.size;
@@ -52,20 +50,7 @@ namespace core {
 			return *this;
 		}
 
-		ref<vector<type>> operator=(cref<vector<type>> other) {
-			data = other.data;
-			reserve = other.reserve;
-			size = other.size;
-
-			ref<vector<type>> tmp = const_cast<vector<type>&>(other);
-			tmp.data = nullptr;
-			tmp.reserve = 0;
-			tmp.size = 0;
-
-			return *this;
-		}
-
-		ref<vector<type>> operator=(std::initializer_list<type> l) {
+		ref<this_type> operator=(std::initializer_list<type> l) {
 			_allocate(0);
 			for (auto& item : l) {
 				add(item);
@@ -100,12 +85,12 @@ namespace core {
 			reserve = (u32)(ptr.size / sizeof(type));
 		}
 
-		void add(cref<type> val) {
+		void add(type&& val) {
 			if (reserve <= size) {
 				resize(reserve * 2);
 			}
 
-			copy<type>(val, data[size++]);
+			data[size++] = move_data(val);
 		}
 
 		ref<type> add() {
@@ -129,31 +114,33 @@ namespace core {
 		}
 
 		struct iterator_base {
-			iterator_base(type* in) : data(in) {}
+			iterator_base(cref<this_type> in, u32 idx)
+			: data(in), index(idx) {}
 
 			bool operator!=(cref<iterator_base> other) const {
-				return data != other.data;
+				return index != other.index;
 			}
 
 			ref<type> operator*() const {
-				return *data;
+				return data[index];
 			}
 
-			type* data;
+			cref<this_type> data;
+			u32 index;
 		};
 
 		struct forward_iterator : public iterator_base {
-			forward_iterator(type* in) : iterator_base(in) {}
+			using iterator_base::iterator_base;
 			ref<forward_iterator> operator++() {
-				data++;
+				iterator_base::index++;
 				return *this;
 			}
 		};
 
 		struct reverse_iterator : public iterator_base {
-			reverse_iterator(type* in): iterator_base(in) {}
+			using iterator_base::iterator_base;
 			ref<reverse_iterator> operator++() {
-				data--;
+				iterator_base::index--;
 				return *this;
 			}
 		};
