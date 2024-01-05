@@ -32,7 +32,7 @@ export namespace core {
 		void acquire() const;
 		void release() const;
 
-		ptr<void> handle;
+		core::handle handle;
 	};
 
 	struct semaphore {
@@ -46,7 +46,7 @@ export namespace core {
 		void acquire() const;
 		void release() const;
 
-		ptr<void> handle;
+		core::handle handle;
 	};
 
 	// writer priority rw lock
@@ -111,7 +111,7 @@ export namespace core {
 			return write_lock(*this);
 		}
 
-		ptr<void> handle;
+		core::ptr<void> handle;
 	};
 
 	template <typename T, typename Impl>

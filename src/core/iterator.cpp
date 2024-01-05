@@ -6,15 +6,15 @@ export module core.iterator;
 
 export namespace core {
 	template <typename T>
-	struct view_base {
+	struct adaptor {
 		using container = T;
-		view_base(cref<container> in) : data(in) {}
+		adaptor(cref<container> in) : data(in) {}
 		cref<container> data;
 	};
 
 	template <typename T>
-	struct forward : public view_base<T> {
-		forward(cref<T> in) : view_base(in) {}
+	struct forward : public adaptor<T> {
+		forward(cref<T> in) : adaptor(in) {}
 
 		auto begin() const {
 			return data.begin();
@@ -26,8 +26,8 @@ export namespace core {
 	};
 
 	template <typename T>
-	struct reverse : public view_base<T> {
-		reverse(cref<T> in) : view_base(in) {}
+	struct reverse : public adaptor<T> {
+		reverse(cref<T> in) : adaptor(in) {}
 
 		auto begin() const {
 			return data.rbegin();

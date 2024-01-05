@@ -28,16 +28,11 @@ export namespace core {
 	template <typename T>
 	struct ptr_base {
 		using type = T;
+		using this_type = ptr_base<T>;
 
 		ptr_base() = default;
 
-		// take ownership
-		ptr_base(cref<ptr_base<type>> other)
-		: data(nullptr) {
-			*this = other;
-		}
-
-		ptr_base(ptr_base<type>&& other)
+		ptr_base(this_type&& other)
 		: data(nullptr) {
 			*this = move_data(other);
 		}
@@ -45,19 +40,13 @@ export namespace core {
 		ptr_base(type* in)
 		: data(in) {}
 
-		ref<ptr_base<type>> operator=(cref<ptr_base<type>> other) {
-			data = other.data;
-			const_cast<ptr_base<type>&>(other) = nullptr;
-			return *this;
-		}
-
-		ref<ptr_base<type>> operator=(ptr_base<type>&& other) {
+		ref<this_type> operator=(this_type&& other) {
 			data = other.data;
 			other.data = nullptr;
 			return *this;
 		}
 
-		ref<ptr_base<type>> operator=(type* in) {
+		ref<this_type> operator=(type* in) {
 			data = in;
 			return *this;
 		}
@@ -113,6 +102,24 @@ export namespace core {
 		template<typename S>
 		ref<S> get() const {
 			return *(S*)ptr_base::data;
+		}
+	};
+
+	struct handle : public ptr<void> {
+		using parent_type = ptr<void>;
+		handle()
+		: data(nullptr) {}
+		handle(cref<parent_type> other)
+		: data(nullptr) {
+			*this = other;
+		}
+
+		ref<handle> operator=(cref<parent_type> other) {
+			data = other.data;
+		}
+
+		~handle() {
+			data = nullptr;
 		}
 	};
 

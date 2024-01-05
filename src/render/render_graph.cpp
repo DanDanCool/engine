@@ -12,63 +12,104 @@ import core.memory;
 import math.vec;
 
 export namespace render {
-	enum {
-		PIPELINE_TYPE_GRAPHICS
+	enum class pipeline_type {
+		graphics
 	};
 
-	enum {
-		BUFFER_TYPE_VERTEX = 1 << 0,
-		BUFFER_TYPE_INDEX = 1 << 1,
-		BUFFER_TYPE_STAGING = 1 << 2,
-		BUFFER_TYPE_HOST = 1 << 3,
+	enum class buffer_type {
+		vertex = 1 << 0,
+		index = 1 << 1,
+		staging = 1 << 2,
+		host = 1 << 3,
 	};
 
-	enum {
-		QUEUE_TYPE_GRAPHICS,
-		QUEUE_TYPE_TRANSFER,
+	enum class queue_type {
+		graphics,
+		transfer,
 	};
+
+	ENUM_CLASS_OPERATORS(pipeline_type);
+	ENUM_CLASS_OPERATORS(buffer_type);
+	ENUM_CLASS_OPERATORS(queue_type);
 
 	struct framebuffer {
 		math::vec2i size();
-		core::ptr<void> data;
+		core::handle data;
 	};
 
 	// on platforms that allow it, these should be aliased
 	struct buffer {
-		template<typename T>
-		void data(cref<core::vector<T>> in) {
-			data((u8*)in.data, in.size * sizeof(T));
+		core::handle data;
+	};
+
+	struct renderpass {
+		core::handle data;
+	};
+
+	struct pipeline {
+		render::renderpass renderpass() {
+			return renderpass{};
 		}
 
-		void data(u8* in, u32 bytes);
+		core::handle data;
+	};
 
-		core::ptr<void> data;
+	struct descriptor_set {
+		using pair_type = core::pair<core::string, core::handle>;
+		void update(cref<core::vector<pair_type>> writes) {
+
+		}
+
+		core::handle data;
 	};
 
 	struct command_buffer {
-		void begin_renderpass(ref<framebuffer> fb);
-		void end_renderpass();
+		void begin(cref<renderpass> pass, cref<framebuffer> fb) {
 
-		void bind_pipeline(pipeline_type type, cref<core::string> name);
+		}
 
-		void bind_vertexbuffers(cref<core::vector<buffer>> vbs);
-		void bind_vertexbuffer(cref<buffer> vb);
-		void bind_indexbuffer(<cref<buffer> ib);
+		void end() {
 
-		void draw_indexed();
+		}
 
-		// might need vector forms for multi viewport applications (XR)
-		void set_viewport(math::vec2f topleft, math::vec2f size, math::vec2f depth);
-		void set_scissor(math::vec2i offset, math::vec2i extent);
+		void descriptor_set(cref<core::vector<descriptor_set>> sets) {
 
-		core::ptr<void> data;
+		}
+
+		void pipeline(pipeline_type type, cref<pipeline> pipe) {
+
+		}
+
+		// might need vector forms for multi viewport (XR)
+		void viewport(math::vec2f topleft, math::vec2f size, math::vec2f depth) {
+
+		}
+
+		void scissor(math::vec2i offset, math::vec2i extent) {
+
+		}
+
+		void draw(cref<core::vector<buffer>> vb, cref<buffer> ib) {
+
+		}
+
+		void draw(cref<buffer> vb, cref<buffer> ib) {
+
+		}
+
+		core::handle data;
 	};
 
 	// synchronization object between gpu and cpu
 	struct fence {
-		void wait();
-		void reset();
-		core::ptr<void> data;
+		void wait() {
+
+		}
+
+		void reset() {
+
+		}
+		core::handle data;
 	};
 }
 
@@ -95,18 +136,9 @@ export namespace jolly {
 		}
 
 		// graph commands
-		void add(cref<core::string> name, pfn_render_node renderfn, cref<core::vector<core::string>> dependencies) {
+		void add(cref<core::string> name, pfn_render_node renderfn) {
 			core::lock lock(busy);
 			nodes[name].renderfn = renderfn;
-
-			auto& vec = graph[name];
-			if (!vec.data) {
-				vec = core::vector<core::string>(0);
-			}
-
-			for (auto& dependency : dependencies) {
-				vec.add(dependency);
-			}
 		}
 
 		// build the graph and allocate resources
@@ -117,32 +149,57 @@ export namespace jolly {
 
 		// render
 		void execute() {
-
+			core::lock lock(busy);
 		}
 
 		// rendering commands
-		core::vector<render::command_buffer> command_buffers(u32 type, u32 count, render::fence* fence = nullptr);
-		render::command_buffer command_buffer(render::queue_type type, render::fence* fence = nullptr);
+		render::command_buffer command_buffer(render::queue_type type, u32 count) {
+			return render::comand_buffer{};
+		}
 
-		bool framebuffer(u32 i, ref<render::framebuffer> fb); // swapchain framebuffer, may fail
-		render::framebuffer framebuffer(cref<core::string> name); // off screen framebuffer
+		// swapchain framebuffer, may fail
+		bool swapchain(u32 i, ref<render::framebuffer> fb) {
+			return true;
+		}
 
-		render::buffer buffer(cref<core::string> name, u32 size, u32 type);
-		void _present(); // internal use only
+		// off screen framebuffer
+		render::framebuffer framebuffer(cref<core::string> name) {
+			return render::framebuffer{};
+		}
 
-		render::fence fence(cref<core::string> name);
+		template<typename T>
+		render::buffer buffer(cref<core::vector<T>> data, u32 type) {
+			return render::buffer{};
+		}
 
-		void submit(cref<render::command_buffer> cmd);
-		void submit(cref<core::vector<render::command_buffer>> cmds);
+		render::pipeline pipeline(cref<core::string> name) {
+			return render::pipeline{};
+		}
 
-		void submit(cref<render::command_buffer> cmd, cref<render::fence> fence);
-		void submit(cref<core::vector<render::command_buffer>> cmds, cref<render::fence> fence);
+		render::descriptor_set descriptor_set(cref<render::pipeline> pipe, u32 set = 0) {
+			return render::descriptor_set{};
+		}
 
-		// additional node ordering information
-		void input(cref<core::string> name);
-		void input(cref<core::vector<core::string>> names);
-		void output(cref<core::string> name);
-		void output(cref<core::vector<core::string>> names);
+		void submit(cref<render::command_buffer> cmd) {
+
+		}
+
+		void submit(cref<core::vector<render::command_buffer>> cmds) {
+
+		}
+
+		core::handle input(cref<core::string> name) {
+			return core::handle{};
+		}
+
+		void output(cref<core::string> name, core::handle out) {
+
+		}
+
+		// internal use only
+		void _present() {
+
+		}
 
 		core::table<core::string, pfn_render_node> nodes;
 		core::table<core::string, core::vector<core::string>> graph;

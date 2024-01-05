@@ -10,7 +10,7 @@ module core.file;
 
 namespace core {
 	static int convert_flags(access _access);
-	static int get_fd(cref<ptr<void>> handle);
+	static int get_fd(cref<handle> handle);
 
 	file::file(cref<string> fname, access _access)
 	: handle() {
@@ -30,7 +30,6 @@ namespace core {
 		if (!handle) return;
 		int fd = get_fd(handle);
 		_close(fd);
-		handle = nullptr;
 	}
 
 	u32 file::write(memptr buf) {

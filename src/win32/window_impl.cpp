@@ -53,7 +53,12 @@ namespace jolly {
 		RegisterClassExW(&info);
 		create(name, sz);
 
-		_defaults();
+		auto close_cb = [](ref<window> state, u32 id, win_event event) {
+			DestroyWindow((HWND)state.windows[id].data);
+		};
+
+		add_cb(win_event::close, close_cb);
+		add_cb(win_event::destroy, win_destroy_cb);
 	}
 
 	window::~window() {
@@ -66,15 +71,6 @@ namespace jolly {
 
 		UnregisterClassW(WNDCLASS_NAME, (HINSTANCE)handle.data);
 		handle = nullptr;
-	}
-
-	void window::_defaults() {
-		auto close_cb = [](ref<window> state, u32 id, win_event event) {
-			DestroyWindow((HWND)state.windows[id].data);
-		};
-
-		add_cb(win_event::close, close_cb);
-		add_cb(win_event::destroy, win_destroy_cb);
 	}
 
 	u32 window::create(cref<core::string> name, math::vec2i sz) {

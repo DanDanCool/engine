@@ -36,7 +36,7 @@ export namespace core {
 
 		void flush();
 
-		ptr<void> handle;
+		core::handle handle;
 	};
 
 	struct file_buf : file {

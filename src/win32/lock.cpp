@@ -19,7 +19,6 @@ namespace core {
 	mutex::~mutex() {
 		if (!handle) return;
 		CloseHandle((HANDLE)handle);
-		handle = nullptr;
 	}
 
 	ref<mutex> mutex::operator=(mutex&& other) {
@@ -54,7 +53,6 @@ namespace core {
 	semaphore::~semaphore() {
 		if (!handle) return;
 		CloseHandle((HANDLE)handle.data);
-		handle = nullptr;
 	}
 
 	ref<semaphore> semaphore::operator=(semaphore&& other) {

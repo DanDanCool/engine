@@ -55,56 +55,68 @@ namespace jolly {
 
 			auto renderui = [](ref<render_graph> graph) {
 				// other_node -> graph.output("main")
-				// input/output specifiers allow for more dynamic dependencies, for more dynamic graphs
-				graph.input("main"); // specify dependency on 'main' resource
+				auto resource = graph.input("main"); // specify dependency on 'main' resource
 
-				auto fence = graph.fence("render_finished"); // limit amount of frames we work on
-				fence.wait();
+				// graph creates a default renderpass, pipeline, and framebuffers for presentation purposes
+				// it can be accessed by calling respective functions without arguments
 
 				core::vector<render::command_buffer> cmds = graph.command_buffer(render::queue_type::graphics, windows.size);
 				for (i32 i : core::range(windows)) {
 					// graph.framebuffer("main"); // creates an offscreen framebuffer
 					render::framebuffer fb;
 					 // gets swapchain framebuffer
-					if (!graph.framebuffer(i, fb)) {
+					if (!graph.swapchain(i, fb)) {
 						continue; // likely that swapchain is being resized
 					}
 
 					auto& cmd = cmds[i];
 
+					auto vb_data = core::vector<f32>();
+					auto ib_data = core::vector<i32>();
+
+					// staging buffers, resource transitions should be automatic
 					// resources often need several instances to deal with multiple frames
 					// probably do one allocation per frame
-					// auto& vb = graph.vertexbuffer("obj_model", HOST_MEMORY);
-					render::buffer_type flags = render::buffer_type::vertex | render::buffer_type::staging;
-					u32 vb_size = 0; // put a limit here
-					auto vb = graph.buffer(core::format_string("swapvb%", i).data, size, flags);
-					vb.data(vertices);
+					render::buffer_type flags = render::buffer_type::vertex;
+					auto vb = graph.buffer(vb_data, flags);
 
-					flags = render::buffer_type::index | render::buffer_type::staging;
-					u32 ib_size = 0;
-					auto ib = graph.buffer(core::format_string("swapib%", i).data, size, flags);
-					ib.data(indices);
+					flags = render::buffer_type::index;
+					auto ib = graph.buffer(ib_data, flags);
+
+					// pipelines loaded by name
+					auto pipeline = graph.pipeline("name");
 
 					// automatically depend on semaphores
 					// resource should contain semaphore objects
-					cmd.begin_renderpass(fb);
-					cmd.bind_pipeline(render::pipeline_type::graphics, "quad");
-					// cmd.bind_vertexbuffers({ a, b, c });
-					cmd.bind_vertexbuffer(vb);
-					cmd.bind_indexbuffer(ib);
+					// graph.renderpass() gives default renderpass
+					// each command buffer is associated with one renderpass/subpass
+					// recording multiple render passes in a buffer is not possible
+					cmd.begin(pipeline.renderpass(), fb);
 
 					auto [x, y] = fb.size();
-					cmd.set_viewport(math::vec2f{ 0, 0 }, math::vec2f{ x, y }, math::vec2f{ 0.0f, 1.0f });
-					cmd.set_scissor(math::vec2i{ 0, 0 }, math::vec2i{ x, y });
+					cmd.viewport(math::vec2f{ 0, 0 }, math::vec2f{ x, y }, math::vec2f{ 0.0f, 1.0f });
+					cmd.scissor(math::vec2i{ 0, 0 }, math::vec2i{ x, y });
 
-					cmd.draw_indexed();
-					cmd.end_renderpass();
+					// get set based off of index
+					auto set = graph.descriptor_set(pipeline);
+
+					auto lighting_buffer = graph.buffer(vb_data, flags);
+					auto transform_buffer = graph.buffer(vb_data, flags);
+					// update set using names instead of binding number
+					set.update({ {"lighting", lighting_buffer.data}, {"transforms", transform_buffer.data} });
+
+					cmd.descriptor_set(sets);
+					cmd.pipeline(pipeline);
+
+					// cmd.compute(compute);
+					// cmd.draw({color, uv, specular}, ib);
+					cmd.draw(vb_data, ib);
+
+					// renderpass automatically ended when going out of scope
 				}
 
-				fence.reset();
-				graph.submit(cmds, fence);
-
-				graph.output("swapchain");
+				graph.submit(cmds);
+				graph.output("present", resource);
 			};
 
 			auto& render = (ref<render_thread>)engine::instance().get("render");

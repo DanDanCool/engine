@@ -11,6 +11,7 @@ import core.vector;
 import core.log;
 import core.set;
 import core.file;
+import core.view;
 import math.vec;
 import vulkan.surface;
 import win32.window;
@@ -151,14 +152,9 @@ export namespace jolly {
 			layers.size = count;
 
 			for (auto name : enabled_layers) {
-				bool found = false;
-				for (auto& layer : layers) {
-					if (core::cmpeq(name, layer.layerName)) {
-						found = true;
-						break;
-					}
-				}
-
+				bool found = core::view::has(layers, [name](cref<VkLayerProperties> layer) {
+					return core::cmpeq(name, layer.layerName);
+						});
 				JOLLY_ASSERT(found, "validation layer not found");
 			}
 
@@ -262,7 +258,7 @@ export namespace jolly {
 				core::vector<VkDeviceQueueCreateInfo> queue_info(indices.size);
 				for (u32 i : indices) {
 					if (i == U32_MAX) continue;
-					float priority = 1;
+					f32 priority = 1;
 					auto& info = queue_info.add();
 					info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 					info.queueFamilyIndex = i;
@@ -283,14 +279,9 @@ export namespace jolly {
 
 				bool all_extensions = true;
 				for (cstr name : extensions) {
-					bool found = false;
-					for (auto& extension : available) {
-						if (core::cmpeq(name, extension.extensionName)) {
-							found = true;
-							break;
-						}
-					}
-
+					bool found = core::view::has(available, [name](cref<VkExtensionProperties> property) {
+						return core::cmpeq(name, property.extensionName);
+							});
 					all_extensions &= found;
 					if (!all_extensions) break;
 				}

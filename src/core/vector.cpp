@@ -109,6 +109,16 @@ namespace core {
 			zero8(bytes(data[size]), sizeof(type));
 		}
 
+		u32 find(cref<type> other) const {
+			for (u32 i : range(size)) {
+				if (cmpeq(data[i], other)) {
+					return i;
+				}
+			}
+
+			return U32_MAX;
+		}
+
 		ref<type> operator[](u32 idx) const {
 			return data[idx];
 		}

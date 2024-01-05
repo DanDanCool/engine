@@ -34,8 +34,6 @@ namespace jolly {
 		window(cref<core::string> name, math::vec2i sz = {1280, 720});
 		~window();
 
-		void _defaults();
-
 		u32 create(cref<core::string> name, math::vec2i sz = {1280, 720});
 
 		void step(f32 ms);
