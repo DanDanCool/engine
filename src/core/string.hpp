@@ -6,11 +6,13 @@ export module core.string;
 import core.memory;
 import core.simd;
 import core.operations;
+import core.iterator;
 
 export namespace core {
 	template<typename T>
 	struct string_base {
 		using type = T;
+		using this_type = string_base<T>;
 
 		string_base() = default;
 		string_base(const type* str)
@@ -21,7 +23,12 @@ export namespace core {
 		string_base(type* str, u64 size)
 		: data(str), size(size) {}
 
-		string_base(string_base&& other)
+		string_base(this_type&& other)
+		: data(nullptr), size(0) {
+			*this = forward_data(other);
+		}
+
+		string_base(cref<this_type> other)
 		: data(nullptr), size(0) {
 			*this = other;
 		}
@@ -31,7 +38,7 @@ export namespace core {
 			free256((void*)data);
 		}
 
-		ref<string_base> operator=(string_base&& other) {
+		ref<this_type> operator=(this_type&& other) {
 			data = other.data;
 			size = other.size;
 
@@ -40,7 +47,12 @@ export namespace core {
 			return *this;
 		}
 
-		ref<string_base> operator=(const type* str) {
+		ref<this_type> operator=(cref<this_type> other) {
+			*this = forward_data(other.copy());
+			return *this;
+		}
+
+		ref<this_type> operator=(const type* str) {
 			u64 count = 0;
 			while (str[count]) {
 				count++;
@@ -71,7 +83,7 @@ export namespace core {
 			return cref(data[idx]);
 		}
 
-		bool operator==(cref<string_base> other) const {
+		bool operator==(cref<this_type> other) const {
 			if (size != other.size) return false;
 			return cmp256((u8*)data, (u8*)other.data, align_size256((u32)size));
 		}
@@ -84,11 +96,11 @@ export namespace core {
 			return memptr{ (u8*)data, size * sizeof(type) };
 		}
 
-		string_base copy() {
+		this_type copy() const {
 			u32 bytes = (u32)((size + 1) * sizeof(type));
 			memptr ptr = alloc256(bytes);
 			copy256((u8*)data, ptr.data, align_size256(bytes));
-			return move_data(string_base((type*)data, size));
+			return forward_data(this_type((type*)data, size));
 		}
 
 		struct iterator_base {
@@ -108,7 +120,7 @@ export namespace core {
 		struct forward_iterator : public iterator_base {
 			forward_iterator(type* in) : iterator_base(in) {}
 			forward_iterator& operator++() {
-				data++;
+				iterator_base::data++;
 				return *this;
 			}
 		};
@@ -124,7 +136,7 @@ export namespace core {
 		struct reverse_iterator : public iterator_base {
 			reverse_iterator(type* in): iterator_base(in) {}
 			reverse_iterator& operator++() {
-				data--;
+				iterator_base::data--;
 				return *this;
 			}
 		};
@@ -150,9 +162,22 @@ export namespace core {
 	};
 
 	template <typename T>
-	struct hash_info<string_base<T>> {
-		static u32 hash(cref<string_base<T>> key) {
-			return fnv1a((u8*)key.data, (u32)(key.size * sizeof(T)));
+	struct operations<string_base<T>>: public operations_base<string_base<T>> {
+		using type = T;
+		using string_type = string_base<T>;
+
+		static string_type copy(cref<string_type> src) {
+			return src.copy();
+		}
+
+		static u32 hash(cref<string_type> key) {
+			return fnv1a((u8*)key.data, (u32)(key.size * sizeof(type)));
+		}
+
+		static void swap(ref<string_type> a, ref<string_type> b) {
+			string_type tmp(a.data, a.size);
+			a = forward_data(string_type(b.data, b.size));
+			b = forward_data(tmp);
 		}
 	};
 

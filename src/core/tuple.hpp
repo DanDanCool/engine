@@ -6,13 +6,62 @@ export module core.tuple;
 import core.memory;
 import core.traits;
 import core.simd;
+import core.operations;
+import core.iterator;
 
 export namespace core {
+	// reference wrapper
+	template <typename T>
+	struct wref {
+		using type = T;
+		wref(type& in)
+		: data(in) {}
+
+		operator cref<type>() const {
+			return data;
+		}
+
+		operator ref<type>() {
+			return data;
+		}
+
+		type* operator->() const {
+			return &data;
+		}
+
+		type& data;
+	};
+
 	template <typename T1, typename T2>
 	struct pair {
+		using this_type = pair<T1, T2>;
 		pair() = default;
+
+		pair(T1&& a, T2&& b)
+			: one(forward_data(a)), two(forward_data(b)) {}
+
 		pair(cref<T1> a, cref<T2> b)
 			: one(a), two(b) {}
+
+		pair(this_type&& other) {
+			*this = forward_data(other);
+		}
+
+		pair(cref<this_type> other) {
+			*this = other;
+		}
+
+		ref<this_type> operator=(this_type&& other) {
+			one = forward_data(other.one);
+			two = forward_data(other.two);
+			return *this;
+		}
+
+		ref<this_type> operator=(cref<this_type> other) {
+			one = forward_data(copy(other.one));
+			two = forward_data(copy(other.two));
+			return *this;
+		}
 
 		~pair() = default;
 
@@ -41,36 +90,49 @@ export namespace core {
 		u32 index;
 	};
 
-	template <u32... S>
-	struct index_sequence {
-		using type = index_sequence;
+	template <typename T, T... S>
+	struct sequence_base {
+		using type = T;
+		using this_type = sequence_base<T, S...>;
+
+		static constexpr type size() {
+			return sizeof...(S);
+		}
 	};
 
 #ifdef _MSC_VER
-	template <u32 N>
-	using index_sequential = __make_integer_seq<index_sequence, u32, N>;
+	// https://github.com/microsoft/STL/blob/b84bf09ab6f9267992f899956cea46e7824fe0c3/stl/inc/utility#L53C80-L53C80
+	template <typename T, T N>
+	using make_sequence = __make_integer_seq<sequence_base, T, N>;
 #endif
+
+	template <u32... S>
+	using index_sequence = sequence_base<u32, S...>;
+
+	template <u32 N>
+	using index_sequential = make_sequence<u32, N>;
 
 	template<u32 N, typename T>
 	struct tuple_node {
 		using type = T;
 
+		tuple_node() = default;
 		tuple_node(type&& arg)
-		: data(move_data(arg)) {
-
-		}
+		: data(forward_data(arg)) {}
 
 		type data;
 	};
 
+	// http://mitchnull.blogspot.com/2012/06/c11-tuple-implementation-details-part-1.html
 	template <typename Indices, typename... Ts>
 	struct _tuple_data {
-		static_assert(false); // this should never be instantiated
+		_tuple_data() = delete;
 	};
 
 	template <u32... Indices, typename... Ts>
 	struct _tuple_data<index_sequence<Indices...>, Ts...> : public tuple_node<Indices, Ts>... {
-		tuple_data(Ts&& args...)
+		_tuple_data() = default;
+		_tuple_data(Ts&&... args)
 		: tuple_node<Indices, Ts>(forward_data(args))... {
 
 		}
@@ -79,9 +141,10 @@ export namespace core {
 	template <typename... Ts>
 	using tuple_data = _tuple_data<index_sequential<sizeof...(Ts)>, Ts...>;
 
+	// recursive template... look into compiler intrinsics
 	template<u32 I, typename T, typename... Ts>
 	struct tuple_element {
-		typedef tuple_element<I - 1, Ts>::type type;
+		typedef tuple_element<I - 1, Ts...>::type type;
 	};
 
 	template<typename T, typename... Ts>
@@ -93,9 +156,15 @@ export namespace core {
 	using tuple_element_t = typename tuple_element<I, Ts...>::type;
 
 	template<u32 I, typename... Ts>
-	tuple_element_t<I, Ts...>& tuple_get(tuple_data<Ts...> data) {
+	cref<tuple_element_t<I, Ts...>> tuple_get(cref<tuple_data<Ts...>> data) {
 		using node = tuple_node<I, tuple_element_t<I, Ts...>>;
-		return static_cast<node&>(data).data;
+		return static_cast<cref<node>>(data).data;
+	}
+
+	template<u32 I, typename... Ts>
+	ref<tuple_element_t<I, Ts...>> tuple_get(ref<tuple_data<Ts...>> data) {
+		using node = tuple_node<I, tuple_element_t<I, Ts...>>;
+		return static_cast<ref<node>>(data).data;
 	}
 
 	template<typename... Ts>
@@ -103,7 +172,7 @@ export namespace core {
 		using this_type = tuple<Ts...>;
 		using sequence_type = index_sequential<sizeof...(Ts)>;
 
-		tuple(Ts&& args...)
+		tuple(Ts&&... args)
 		: data(forward_data(args)...) {
 
 		}
@@ -120,17 +189,21 @@ export namespace core {
 
 		template<u32... Indices>
 		void _move(this_type&& other, index_sequence<Indices...>) {
-			swallow(_move_helper<Indices>(forward_data(other)));
-		}
+			auto helper = []<u32 I>(this_type&& src, ref<this_type> dst, uint_constant<I>) {
+				dst.get<I>() = forward_data(src.get<I>());
+				return 0;
+			};
 
-		template <u32 I>
-		int _move_helper(this_type&& other) {
-			get<I>() = forward_data(other.get<I>());
-			return 0;
+			swallow(helper(forward_data(other), *this, uint_constant<Indices>{})...);
 		}
 
 		template<u32 I>
-		auto& get() {
+		cref<tuple_element_t<I, Ts...>> get() const {
+			return tuple_get<I>(data);
+		}
+
+		template<u32 I>
+		ref<tuple_element_t<I, Ts...>> get() {
 			return tuple_get<I>(data);
 		}
 
@@ -149,7 +222,9 @@ export namespace core {
 		using tuple_type = tuple<Ts*...>;
 		using sequence_type = index_sequential<sizeof...(Ts)>;
 
-		multi_vector() = default;
+		multi_vector()
+		: data((Ts*)nullptr...), reserve(0), size(0) {}
+
 		multi_vector(u32 sz)
 		: data((Ts*)nullptr...), reserve(0), size(0) {
 			sz = max<u32>(sz, MULTI_VECTOR_DEFAULT_SIZE);
@@ -158,7 +233,7 @@ export namespace core {
 
 		multi_vector(this_type&& other)
 		: data((Ts*)nullptr...), reserve(0), size(0) {
-			*this = other;
+			*this = forward_data(other);
 		}
 
 		~multi_vector() {
@@ -175,46 +250,27 @@ export namespace core {
 			other.data = tuple_type{ (Ts*)nullptr... };
 			other.reserve = 0;
 			other.size = 0;
+			return *this;
 		}
 
 		template<u32 I>
-		tuple_element_t<I, Ts...>& get(u32 idx) {
+		tuple_element_t<I, Ts...>& get(u32 idx) const {
 			return data.get<I>()[idx];
 		}
 
 		void resize(u32 sz) {
-			auto resize_helper = []<u32... Indices>(ref<tuple_type> src, ref<tuple_type> dst, u32 count, index_sequence<Indices...>) {
-				auto helper = []<u32 I>(tuple_element_t<I, Ts...>* src, tuple_element<I, Ts...>* dst, u32 count, uint_constant<I>) {
-					u32 bytes = (u32)(count * sizeof(tuple_element_t<I, Ts...>));
-					copy256((u8*)src, (u8*)dst, align_size256(bytes));
-					free256((u8*)src);
-					return 0;
-				};
-
-				swallow(helper(src.get<Indices>(), dst.get<Indices>(), count, uint_constant<Indices>{})...);
-			};
-
 			tuple_type old = forward_data(data);
-
-			count = reserve;
-			allocate(sz);
-			resize_helper(old, data, count, sequence_type{});
+			u32 count = reserve;
+			allocate(sz, sequence_type{});
+			_resize(old, count, sequence_type{});
 		}
 
-		void add(Ts&&... data) {
-			auto add_helper = []<u32... Indices>(ref<tuple_element> dst, u32 idx, Ts&&... data, index_sequence<Indices...>) {
-				auto helper = []<u32 I>(ref<tuple_element_t<I, Ts...>> dst, tuple_element_t<I, Ts...>&& data, uint_constant<I>) {
-					dst = move_data(data);
-					return 0;
-				};
-				swallow(helper(dst.get<Indices>()[idx], forward_data(data), uint_constant<Indices>{})...);
-			};
-
+		void add(Ts&&... vals) {
 			if (reserve <= size) {
 				resize(reserve * 2);
 			}
 
-			add_helper(data, size++, forward_data(data), sequence_type{});
+			_add(size++, forward_data(vals)..., sequence_type{});
 		}
 
 		void del(u32 idx) {
@@ -229,7 +285,7 @@ export namespace core {
 				swallow(helper(data.get<Indices>()[idx], data.get<Indices>()[last], uint_constant<Indices>{})...);
 			};
 
-			helper(data, idx, --size, sequence_type{});
+			del_helper(data, idx, --size, sequence_type{});
 		}
 
 		template<u32... Indices>
@@ -246,7 +302,7 @@ export namespace core {
 
 		template<u32... Indices>
 		void destroy(index_sequence<Indices...>) {
-			auto helper = []<typename T>(ref<T*> arg) {
+			auto helper = []<typename T>(ref<T*> arg, u32 size) {
 				if (!arg) return 0;
 				for (int i : range(size)) {
 					core::destroy(&arg[i]);
@@ -257,7 +313,30 @@ export namespace core {
 				return 0;
 			};
 
-			swallow(helper(data.get<Indices>())...);
+			swallow(helper(data.get<Indices>(), size)...);
+		}
+
+		template <u32... Indices>
+		void _resize(ref<tuple_type> src, u32 count, index_sequence<Indices...>) {
+			auto helper = []<typename T>(T* src, T* dst, u32 count) {
+				u32 bytes = (u32)(count * sizeof(T));
+				copy256((u8*)src, (u8*)dst, align_size256(bytes));
+				free256((u8*)src);
+				return 0;
+			};
+
+			swallow(helper(src.get<Indices>(), data.get<Indices>(), count)...);
+		};
+
+
+		template <u32... Indices>
+		void _add(u32 idx, Ts&&... vals, index_sequence<Indices...>) {
+			auto helper = []<u32 I>(ref<tuple_element_t<I, Ts...>> dst, tuple_element_t<I, Ts...>&& val, uint_constant<I>) {
+				dst = forward_data(val);
+				return 0;
+			};
+
+			swallow(helper(get<Indices>(idx), forward_data(vals), uint_constant<Indices>{})...);
 		}
 
 		tuple_type data;

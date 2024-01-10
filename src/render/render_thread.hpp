@@ -12,20 +12,11 @@ import jolly.system;
 import jolly.render_graph;
 import vulkan.device;
 
-namespace jolly {
+export namespace jolly {
 	struct vk_device;
 	struct render_thread : public system_thread {
-		render_thread();
-		~render_thread();
-
-		virtual void init();
-		virtual void term();
-
-		virtual void run();
-		virtual void step(f32 ms);
-
 		render_thread()
-		: system_thread(), _device(), _run(true) {
+		: system_thread(), _device(), _graph(), _run(true) {
 			LOG_INFO("render system");
 		}
 
@@ -58,9 +49,12 @@ namespace jolly {
 		virtual void step(f32 ms) {
 		}
 
-		ref<render_graph> graph();
+		ref<render_graph> graph() {
+			return _graph;
+		}
 
 		core::ptr<vk_device> _device;
+		render_graph _graph;
 		core::atom<bool> _run;
 	};
 }

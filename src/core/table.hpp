@@ -6,6 +6,9 @@ export module core.table;
 import core.tuple;
 import core.vector;
 import core.tuple;
+import core.operations;
+import core.iterator;
+import core.traits;
 
 export namespace core {
 	constexpr u32 TABLE_PROBE = 24;
@@ -30,7 +33,7 @@ export namespace core {
 
 		table(u32 sz = 0)
 		: _keys(), _vals(0), reserve(table_size(max<u32>(sz, 100))), size(0) {
-			_keys = keymv_type(reserve);
+			_keys = forward_data(keymv_type(reserve));
 		}
 
 		~table() {
@@ -59,10 +62,12 @@ export namespace core {
 			}
 		}
 
-		u32 _probe(key_type key, u32 hash, u32 dense) {
+		u32 _probe(cref<key_type> k, u32 hash, u32 dense) {
 			if (reserve <= size) {
 				resize(reserve * 2);
 			}
+
+			key_type key = forward_data(copy(k));
 
 			u32 probe = 0;
 			u32 i = hash % reserve;
@@ -71,7 +76,7 @@ export namespace core {
 				u32 cur = _keys.get<HASH_INDEX>(i);
 				if (!cur) {
 					_keys.get<HASH_INDEX>(i) = hash;
-					_keys.get<KEY_INDEX>(i) = key;
+					_keys.get<KEY_INDEX>(i) = forward_data(key);
 					_keys.get<SPARSE_INDEX>(i) = dense;
 					_vals.get<DENSE_INDEX>(dense) = i;
 					break;
@@ -117,7 +122,7 @@ export namespace core {
 			}
 
 			u32 dense = _vals.size;
-			_vals.add(foward_data(val), 0);
+			_vals.add(forward_data(val), 0);
 			u32 p = _probe(key, hash(key), dense);
 			size++;
 
@@ -126,10 +131,36 @@ export namespace core {
 			}
 		}
 
-		ref<val_type> get(cref<key_type> key) const {
+		void set(cref<key_type> key, cref<val_type> val) {
+			set(key, forward_data(copy(val)));
+		}
+
+		cref<val_type> get(cref<key_type> key) const {
 			u32 idx = _find(key);
 			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
 			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx));
+		}
+
+		ref<val_type> get(cref<key_type> key) {
+			u32 idx = _find(key);
+			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
+			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx));
+		}
+
+		cref<key_type> get_key(u32 idx) const {
+			return _keys.get<KEY_INDEX>(idx);
+		}
+
+		ref<key_type> get_key(u32 idx) {
+			return _keys.get<KEY_INDEX>(idx);
+		}
+
+		cref<val_type> get_val(u32 idx) const {
+			return _vals.get<VAL_INDEX>(idx);
+		}
+
+		ref<val_type> get_val(u32 idx) {
+			return _vals.get<VAL_INDEX>(idx);
 		}
 
 		void del(cref<key_type> key) {
@@ -137,7 +168,6 @@ export namespace core {
 			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
 
 			_vals.del(_keys.get<SPARSE_INDEX>(idx));
-			_sparse[_dense[_sparse[idx]]] = _sparse[idx];
 			_keys.get<SPARSE_INDEX>(_vals.get<DENSE_INDEX>(_keys.get<SPARSE_INDEX>(idx))) = _keys.get<SPARSE_INDEX>(idx);
 
 			ref<key_type> _key = _keys.get<KEY_INDEX>(idx);
@@ -150,21 +180,14 @@ export namespace core {
 			size--;
 		}
 
-		ref<val_type> operator[](cref<key_type> key) const {
+		cref<val_type> operator[](cref<key_type> key) const {
 			return get(key);
 		}
 
 		ref<val_type> operator[](cref<key_type> key) {
 			u32 idx = _find(key);
 			if (idx == U32_MAX) {
-				_dense.add() = 0;
-				u32 p = _probe(key, hash(key), _vals.size);
-				if (p >= TABLE_PROBE) {
-					resize(reserve * 2);
-				}
-
-				size++;
-				return _vals.add();
+				set(key, val_type());
 			}
 
 			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx));
@@ -174,12 +197,12 @@ export namespace core {
 			iterator_base(cref<keymv_type> _keys, cref<valmv_type> _vals, u32 idx)
 			: keys(_keys), vals(_vals), index(idx) {}
 
-			ref<iterator> operator++() {
+			ref<iterator_base> operator++() {
 				index++;
 				return *this;
 			}
 
-			bool operator!=(cref<iterator> other) const {
+			bool operator!=(cref<iterator_base> other) const {
 				return index != other.index;
 			}
 
@@ -188,76 +211,69 @@ export namespace core {
 			u32 index;
 		};
 
+		template <typename Iterator>
 		struct view_base {
 			view_base(cref<keymv_type> _keys, cref<valmv_type> _vals)
 			: keys(_keys), vals(_vals) {}
+
+			auto begin() {
+				return Iterator(keys, vals, 0);
+			}
+
+			auto end() {
+				return Iterator(keys, vals, vals.size);
+			}
 
 			cref<keymv_type> keys;
 			cref<valmv_type> vals;
 		};
 
-		struct key_view: public view_base {
-			using view_base::view_base;
-
-			struct iterator: public iterator_base {
-				using iterator_base::iterator_base;
-				ref<key_type> operator*() const {
-					return keys[dense[index]];
-					return keys.get<KEY_INDEX>(vals.get<DENSE_INDEX>(index));
-				}
-			};
-
-			auto begin() {
-				return iterator(keys, vals, 0);
-			}
-
-			auto end() {
-				return iterator(keys, vals, vals.size);
+		struct iterator_keys: public iterator_base {
+			using iterator_base::iterator_base;
+			ref<key_type> operator*() const {
+				u32 index = iterator_base::index;
+				auto& keys = iterator_base::keys;
+				auto& vals = iterator_base::vals;
+				return keys.get<KEY_INDEX>(vals.get<DENSE_INDEX>(index));
 			}
 		};
 
-		struct val_view: public view_base {
-			using view_base::view_base;
-
-			struct iterator: public iterator_base {
-				using iterator_base::iterator_base;
-				ref<val_type> operator*() const {
-					return vals.get<VAL_INDEX>(index);
-				}
-			};
-
-			auto begin() {
-				return iterator(keys, vals, 0);
-			}
-
-			auto end() {
-				return iterator(keys, vals, vals.size);
+		struct iterator_vals: public iterator_base {
+			using iterator_base::iterator_base;
+			ref<val_type> operator*() const {
+				u32 index = iterator_base::index;
+				auto& keys = iterator_base::keys;
+				auto& vals = iterator_base::vals;
+				return vals.get<VAL_INDEX>(index);
 			}
 		};
 
 		struct iterator_items: iterator_base {
-			using pair_type = pair<ref<key_type>, ref<val_type>>;
+			using pair_type = pair<wref<key_type>, wref<val_type>>;
 			using iterator_base::iterator_base;
 
 			pair_type operator*() const {
+				u32 index = iterator_base::index;
+				auto& keys = iterator_base::keys;
+				auto& vals = iterator_base::vals;
 				return pair_type(keys.get<KEY_INDEX>(vals.get<DENSE_INDEX>(index)), vals.get<VAL_INDEX>(index));
 			}
 		};
 
-		key_view keys() {
-			return key_view(_keys, _dense);
+		auto keys() {
+			return view_base<iterator_keys>(_keys, _vals);
 		}
 
-		val_view vals() {
-			return val_view(_vals);
+		auto vals() {
+			return view_base<iterator_vals>(_keys, _vals);
 		}
 
 		auto begin() {
-			return iterator_items(_keys, _vals, _dense, 0);
+			return iterator_items(_keys, _vals, 0);
 		}
 
 		auto end() {
-			return iterator_items(_keys, _vals, _dense, size);
+			return iterator_items(_keys, _vals, size);
 		}
 
 		keymv_type _keys;

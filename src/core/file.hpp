@@ -2,8 +2,7 @@ module;
 
 #include "core.h"
 
-export core.file;
-
+export module core.file;
 import core.string;
 import core.memory;
 import core.vector;
@@ -19,43 +18,47 @@ export namespace core {
 
 	ENUM_CLASS_OPERATORS(access);
 
-	struct file {
-		file() = default;
-		file(cref<string> fname, access _access);
-		file(file&& other);
-		virtual ~file();
+	struct file_base {
+		file_base() = default;
+		file_base(cref<string> fname, access _access);
 
-		ref<file> operator=(file&& other) {
+		file_base(file_base&& other)
+		: handle() {
+			*this = forward_data(other);
+		}
+
+		virtual ~file_base();
+
+		ref<file_base> operator=(file_base&& other) {
 			handle = other.handle;
 			return *this;
 		}
 
 		virtual u32 write(memptr buf);
 		virtual u32 read(ref<buffer> buf);
-		virtual vector<u8> read();
+		virtual u32 read(ref<vector<u8>> buf); // read everything
 
 		void flush();
 
 		core::handle handle;
 	};
 
-	struct file_buf : file {
-		file_buf() = default;
+	struct file : file_base {
+		file() = default;
 
-		file_buf(cref<string> fname, access _access)
-		: file(fname, _access), data() {}
+		file(cref<string> fname, access _access)
+		: file_base(fname, _access), data() {}
 
-		file_buf(file_buf&& other)
-		: file() {
-			*this = move_data(other);
+		file(file&& other)
+		: file_base() {
+			*this = forward_data(other);
 		}
 
-		~file_buf() = default;
+		~file() = default;
 
-		ref<file_buf> operator=(file_buf&& other) {
-			file::operator=(move_data(other));
-			data.data = move_data(other.data.data);
-			data.index = move_data(other.data.index);
+		ref<file> operator=(file&& other) {
+			data = forward_data(other.data);
+			file_base::operator=(forward_data(other));
 
 			return *this;
 		}
@@ -77,19 +80,16 @@ export namespace core {
 			return (u32)bytes;
 		}
 
-		virtual u32 read(ref<buffer> buf) {
-			int fd = get_fd(handle);
-			int bytes = _read(fd, buf.data + buf.index, (u32)(buffer::size - buf.index));
-			buf.index += bytes;
-			return bytes;
+		u32 read() {
+			return file_base::read(data);
 		}
 
 		buffer data;
 	};
 
-	file_buf fopen(cref<string> fname, access _access) {
-	return move_data(file_buf(fname, _access));
+	file fopen(cref<string> fname, access _access) {
+		return file(fname, _access);
 	}
 
-	file fopen_raw(cref<string> fname, access _access);
+	file_base fopen_raw(cref<string> fname, access _access);
 }

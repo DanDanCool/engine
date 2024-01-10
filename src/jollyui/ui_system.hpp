@@ -4,14 +4,17 @@ module;
 
 export module jolly.ui_system;
 import core.log;
+import core.lock;
+import core.iterator;
 import jolly.system;
 import jolly.ui;
 import jolly.engine;
 import jolly.components;
 import jolly.render_graph;
 import jolly.render_thread;
+import jolly.ecs;
 
-namespace jolly {
+export namespace jolly {
 	struct ui_system : public system {
 		ui_system() {
 			LOG_INFO("UI system");
@@ -28,29 +31,28 @@ namespace jolly {
 				}
 			};
 
-			auto& state = engine::instance().get_ecs();
-			auto e = state.create();
-			state.add<ui_component>(e, ui_component{
-					math::vec2f{ 0, 0 },
-					math::vec2f{ 1, 1 },
-					math::vec3f{ 0.2f, 0.8f, 0.2f },
-					ui_render});
+			auto state = core::wview_create(engine::instance().get_ecs());
+			auto e = state->create();
+
+			ui_component component{
+				math::vec2i{ 0, 0 },
+				math::vec2i{ 1, 1 },
+				math::vec3f{ 0.2f, 0.8f, 0.2f },
+				ui_render
+			};
+
+			state->add<ui_component>(e, component);
 		}
 
 		virtual void term() {
 			// maybe delete the entities we created
 		}
 
-
-		virtual void term();
-
-		virtual void step(f32 ms);
-
 		virtual void step(f32 ms) {
-			auto& state = engine::instance().get_ecs();
+			auto state = core::rview_create(engine::instance().get_ecs());
 
-			for (auto& [entity, component] : state.view<quad_component>()) {
-				//LOG_INFO("quad_component: e", entity.id());
+			for (auto [entity, component] : core::rview_create(state->view<quad_component>())) {
+				LOG_INFO("quad_component: e", entity.id());
 			}
 
 			auto renderui = [](ref<render_graph> graph) {
@@ -60,8 +62,8 @@ namespace jolly {
 				// graph creates a default renderpass, pipeline, and framebuffers for presentation purposes
 				// it can be accessed by calling respective functions without arguments
 
-				core::vector<render::command_buffer> cmds = graph.command_buffer(render::queue_type::graphics, windows.size);
-				for (i32 i : core::range(windows)) {
+				core::vector<render::command_buffer> cmds = graph.command_buffer(render::queue_type::graphics, graph.windows());
+				for (i32 i : core::range(graph.windows())) {
 					// graph.framebuffer("main"); // creates an offscreen framebuffer
 					render::framebuffer fb;
 					 // gets swapchain framebuffer
@@ -93,8 +95,11 @@ namespace jolly {
 					// recording multiple render passes in a buffer is not possible
 					cmd.begin(pipeline.renderpass(), fb);
 
+					// always bind pipeline first, pipeline data will be used to verify correctness of later commands
+					cmd.pipeline(render::pipeline_type::graphics, pipeline);
+
 					auto [x, y] = fb.size();
-					cmd.viewport(math::vec2f{ 0, 0 }, math::vec2f{ x, y }, math::vec2f{ 0.0f, 1.0f });
+					cmd.viewport(math::vec2f{ 0, 0 }, math::vec2f{ (f32)x, (f32)y }, math::vec2f{ 0.0f, 1.0f });
 					cmd.scissor(math::vec2i{ 0, 0 }, math::vec2i{ x, y });
 
 					// get set based off of index
@@ -105,12 +110,11 @@ namespace jolly {
 					// update set using names instead of binding number
 					set.update({ {"lighting", lighting_buffer.data}, {"transforms", transform_buffer.data} });
 
-					cmd.descriptor_set(sets);
-					cmd.pipeline(pipeline);
+					cmd.descriptor_set({ set });
 
 					// cmd.compute(compute);
 					// cmd.draw({color, uv, specular}, ib);
-					cmd.draw(vb_data, ib);
+					cmd.draw(vb, ib);
 
 					// renderpass automatically ended when going out of scope
 				}

@@ -13,6 +13,7 @@ module;
 export module core.memory;
 import core.simd;
 import core.traits;
+import core.operations;
 
 export namespace core {
 	struct memptr {
@@ -22,6 +23,40 @@ export namespace core {
 
 	memptr alloc256_dbg_win32_(u32 size, const char* fn, int ln);
 	memptr alloc8_dbg_win32_(u32 size, const char* fn, int ln);
+
+	memptr alloc256(u32 size) {
+		memptr ptr = {0};
+		size = align_size256(size);
+
+#ifdef JOLLY_WIN32
+		ptr.data = (u8*)_aligned_malloc(size, DEFAULT_ALIGNMENT);
+#else
+		ptr.data = (u8*)aligned_alloc(DEFAULT_ALIGNMENT, size);
+#endif
+		ptr.size = size;
+		zero256(ptr.data, (u32)ptr.size);
+		return ptr;
+	}
+
+	void free256(void* ptr) {
+#ifdef JOLLY_WIN32
+		_aligned_free(ptr);
+#else
+		free(ptr);
+#endif
+	}
+
+	memptr alloc8(u32 size) {
+		memptr ptr = {0};
+		ptr.size = size;
+		ptr.data = (u8*)malloc(size);
+		zero8(ptr.data, (u32)ptr.size);
+		return ptr;
+	}
+
+	void free8(void* ptr) {
+		free(ptr);
+	}
 
 	template <typename T> struct ptr;
 
@@ -34,7 +69,7 @@ export namespace core {
 
 		ptr_base(this_type&& other)
 		: data(nullptr) {
-			*this = move_data(other);
+			*this = forward_data(other);
 		}
 
 		ptr_base(type* in)
@@ -57,7 +92,6 @@ export namespace core {
 		}
 
 		void destroy() {
-			// there is core::destroy, but this is necessary to deal with void*
 			core::destroy(data);
 			free8(data);
 			data = nullptr;
@@ -67,19 +101,11 @@ export namespace core {
 			return data;
 		}
 
-		type* operator->() const {
-			return data;
-		}
-
-		ref<type> operator[](u32 idx) const {
-			return data[idx];
-		}
-
 		template <typename S>
 		ptr<S> cast() {
 			ptr<S> p((S*)data);
 			data = nullptr;
-			return move_data(p);
+			return forward_data(p);
 		}
 
 		type* data;
@@ -87,47 +113,88 @@ export namespace core {
 
 	template <typename T>
 	struct ptr : public ptr_base<T> {
-		using ptr_base::ptr_base;
 		using type = T;
+		using parent_type = ptr_base<T>;
+		using parent_type::parent_type;
 
 		ref<type> get() const {
-			return *ptr_base::data;
+			return *parent_type::data;
+		}
+
+		ref<type> operator[](u32 idx) const {
+			return parent_type::data[idx];
+		}
+
+		type* operator->() const {
+			return parent_type::data;
 		}
 	};
 
 	template<>
 	struct ptr<void> : public ptr_base<void> {
-		using ptr_base::ptr_base;
+		using parent_type = ptr_base<void>;
+		using parent_type::parent_type;
 
 		template<typename S>
-		ref<S> get() const {
+		cref<S> get() const {
+			return *(S*)ptr_base::data;
+		}
+
+		template<typename S>
+		ref<S> get() {
 			return *(S*)ptr_base::data;
 		}
 	};
 
-	struct handle : public ptr<void> {
-		using parent_type = ptr<void>;
+	struct handle {
 		handle()
-		: data(nullptr) {}
-		handle(cref<parent_type> other)
-		: data(nullptr) {
+		: _data(nullptr) {}
+
+		handle(void* in)
+		: _data(nullptr) {
+			*this = in;
+		}
+
+		handle(cref<handle> other)
+		: _data(nullptr) {
 			*this = other;
 		}
 
-		ref<handle> operator=(cref<parent_type> other) {
-			data = other.data;
+		ref<handle> operator=(void* in) {
+			_data = in;
+			return *this;
+		}
+
+		ref<handle> operator=(cref<handle> other) {
+			*this = other._data.data;
+			return *this;
 		}
 
 		~handle() {
-			data = nullptr;
+			_data = nullptr;
 		}
+
+		template<typename T>
+		cref<T> get() const {
+			return _data.get();
+		}
+
+		void* data() const {
+			return _data.data;
+		}
+
+		operator bool() const {
+			return data();
+		}
+
+		ptr<void> _data;
 	};
 
 	template<typename T, typename... Args>
 	ptr<T> ptr_create(Args&&... args) {
 		T* data = (T*)alloc8(sizeof(T)).data;
 		data = new (data) T(forward_data(args)...);
-		return move_data(ptr<T>(data));
+		return forward_data(ptr<T>(data));
 	}
 
 	struct any {
@@ -143,7 +210,7 @@ export namespace core {
 		template<typename T>
 		any(ptr<T>&& in)
 		: data(nullptr), deleter(nullptr) {
-			*this = move_data(in);
+			*this = forward_data(in);
 		}
 
 		~any() {
@@ -159,13 +226,18 @@ export namespace core {
 
 		template<typename T>
 		ref<any> operator=(ptr<T>&& in) {
-			data = move_data(in.cast<void>());
-			deleter = destroy<T>;
+			*this = in.data;
+			in.data = nullptr;
 			return *this;
 		}
 
 		template <typename T>
-		ref<T> get() const {
+		cref<T> get() const {
+			return data.get<T>();
+		}
+
+		template <typename T>
+		ref<T> get() {
 			return data.get<T>();
 		}
 
@@ -201,14 +273,15 @@ export namespace core {
 		}
 
 		ref<buffer_base> operator=(buffer_base&& other) {
-			data = other.data;
 			index = other.index;
+			data = forward_data(other.data);
 			return *this;
 		}
 
 		u32 write(u8 character) {
 			if (index >= size) return 0;
-			data[index++] = character;
+			u32 idx = (u32)index++;
+			data[idx] = character;
 			return 1;
 		}
 
@@ -242,37 +315,4 @@ export namespace core {
 
 	using buffer = buffer_base<BLOCK_4096>;
 
-	memptr alloc256(u32 size) {
-		memptr ptr = {0};
-		size = align_size256(size);
-
-#ifdef JOLLY_WIN32
-		ptr.data = (u8*)_aligned_malloc(size, DEFAULT_ALIGNMENT);
-#else
-		ptr.data = (u8*)aligned_alloc(DEFAULT_ALIGNMENT, size);
-#endif
-		ptr.size = size;
-		zero256(ptr.data, (u32)ptr.size);
-		return ptr;
-	}
-
-	void free256(void* ptr) {
-#ifdef JOLLY_WIN32
-		_aligned_free(ptr);
-#else
-		free(ptr);
-#endif
-	}
-
-	memptr alloc8(u32 size) {
-		memptr ptr = {0};
-		ptr.size = size;
-		ptr.data = (u8*)malloc(size);
-		zero8(ptr.data, (u32)ptr.size);
-		return ptr;
-	}
-
-	void free8(void* ptr) {
-		free(ptr);
-	}
 }

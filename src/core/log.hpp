@@ -4,13 +4,13 @@ module;
 #include <cstdio>
 
 export module core.log;
-
 import core.string;
 import core.tuple;
 import core.memory;
 import core.iterator;
 import core.file;
 import core.lock;
+import core.traits;
 
 #define FORMAT_INT(type) \
 template<> void format<type>(cref<type> arg, ref<fmtbuf> buf) { format<i64>((i64)arg, buf); }
@@ -28,26 +28,13 @@ export namespace core {
 		}
 	}
 
-	struct format_string {
-		using iterator = string::forward_iterator;
+	template <typename... Args>
+	string format_string(cref<string> fmt, Args&&... args) {
+		auto beg = fmt.begin();
+		auto end = fmt.end();
+		fmtbuf buf;
 
-		template <typename... Args>
-		format_string(cref<string> fmt, Args&&... args)
-		: data(), buf(), beg(fmt.begin()), end(fmt.end()) {
-			swallow(_format(args)...);
-			_format();
-		}
-
-		~format_string() {
-			// consider setting data to null to prevent destruction
-		}
-
-		ref<format_string> operator=(cref<format_string> other) {
-			data = other.data;
-		}
-
-		template <typename T>
-		int _format(cref<T> arg) {
+		auto helper = [&](auto&& arg) {
 			while (beg != end) {
 				if (*beg == '%') {
 					++beg;
@@ -60,25 +47,46 @@ export namespace core {
 
 			format(arg, buf);
 			return 0;
+		};
+
+		swallow(helper(args)...);
+		while (beg != end) {
+			buf.write((u8)*beg);
+			++beg;
 		}
 
-		void _format() {
-			while (beg != end) {
-				buf.write((u8)*beg);
-				++beg;
-			}
+		buf.write(0);
+		i8* data = (i8*)buf.data.data;
+		buf.data = nullptr;
+		return string(data, buf.index);
+	}
 
-			buf.data[fmtbuf::size - 1] = 0;
-			data = string((i8*)buf.data, buf.index);
-			buf.data = nullptr;
-		}
+	struct sink {
+		sink() = default;
+		virtual ~sink() = default;
 
-		string data;
-		fmtbuf buf;
-		iterator beg, end;
+		virtual void write(memptr buf) = 0;
+		virtual void flush() = 0;
 	};
 
-	struct sink;
+	struct stdout_sink : sink {
+		stdout_sink() : _lock() {}
+		~stdout_sink() {
+			flush();
+		}
+
+		virtual void write(memptr buf) {
+			lock l(_lock);
+			fwrite(buf.data, sizeof(u8), buf.size, stdout);
+		}
+
+		virtual void flush() {
+			fflush(stdout);
+		}
+
+		mutex _lock;
+	};
+
 	struct logger {
 		enum class severity {
 			info, warn, crit
@@ -87,7 +95,7 @@ export namespace core {
 		logger()
 		: _sink() {
 			JOLLY_CORE_ASSERT(_instance == nullptr);
-			_sink = ptr_create<stdout_sink>().cast<sink>();
+			_sink = (ptr<sink>)ptr_create<stdout_sink>();
 		}
 
 		~logger() {
@@ -121,19 +129,19 @@ export namespace core {
 		}
 
 
-		inline void info(cref<format_string> fmt) {
-			log(severity::info, fmt.data);
+		inline void info(cref<string> fmt) {
+			log(severity::info, fmt);
 		}
 
-		inline void warn(cref<format_string> fmt) {
-			log(severity::warn, fmt.data);
+		inline void warn(cref<string> fmt) {
+			log(severity::warn, fmt);
 		}
 
-		inline void crit(cref<format_string> fmt) {
-			log(severity::crit, fmt.data);
+		inline void crit(cref<string> fmt) {
+			log(severity::crit, fmt);
 		}
 
-		static ref<logger> logger::instance() {
+		static ref<logger> instance() {
 			if (!_instance) {
 				_instance = ptr_create<logger>();
 			}
@@ -143,35 +151,8 @@ export namespace core {
 
 		ptr<sink> _sink;
 
-		static ptr<logger> _instance = nullptr;
+		static inline ptr<logger> _instance = nullptr;
 	};
-
-	struct sink {
-		sink() = default;
-		virtual ~sink() = default;
-
-		virtual void write(memptr buf) = 0;
-		virtual void flush() = 0;
-	};
-
-	struct stdout_sink : sink {
-		stdout_sink() : _lock() {}
-		~stdout_sink() {
-			flush();
-		}
-
-		virtual void write(memptr buf) {
-			lock l(_lock);
-			fwrite(buf.data, sizeof(u8), buf.size, stdout);
-		}
-
-		virtual void flush() {
-			fflush(stdout);
-		}
-
-		mutex _lock;
-	};
-
 
 	template<>
 	void format<string>(cref<string> arg, ref<fmtbuf> buf) {

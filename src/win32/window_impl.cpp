@@ -6,8 +6,11 @@ module;
 #include <vulkan/vulkan.h>
 
 module win32.window;
+import core.view;
 import vulkan.device;
 import vulkan.surface;
+
+constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
 
 typedef VkFlags VkWin32SurfaceCreateFlagsKHR;
 struct VkWin32SurfaceCreateInfoKHR {
@@ -19,7 +22,7 @@ struct VkWin32SurfaceCreateInfoKHR {
 };
 
 typedef VkResult (APIENTRY *PFN_vkCreateWin32SurfaceKHR)(VkInstance,const VkWin32SurfaceCreateInfoKHR*,const VkAllocationCallbacks*,VkSurfaceKHR*);
-static VkResult vkCreateWin32SurfaceKHR(
+VkResult vkCreateWin32SurfaceKHR(
 		VkInstance instance,
 		const VkWin32SurfaceCreateInfoKHR* info,
 		const VkAllocationCallbacks* callbacks,
@@ -32,8 +35,8 @@ static VkResult vkCreateWin32SurfaceKHR(
 namespace jolly {
 	const auto* WNDCLASS_NAME = L"JOLLY_WNDCLASS";
 
-	static void win_destroy_cb(ref<window> state, u32 id, win_event event);
-	static LRESULT wndproc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam);
+	void win_destroy_cb(ref<window> state, u32 id, win_event event);
+	LRESULT wndproc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam);
 
 	window::window(cref<core::string> name, math::vec2i sz)
 	: handle()
@@ -47,14 +50,14 @@ namespace jolly {
 		info.cbSize = sizeof(WNDCLASSEXW);
 		info.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
 		info.lpfnWndProc = (WNDPROC)wndproc;
-		info.hInstance = (HINSTANCE)handle.data;
+		info.hInstance = (HINSTANCE)handle.data();
 		info.lpszClassName = WNDCLASS_NAME;
 
 		RegisterClassExW(&info);
 		create(name, sz);
 
 		auto close_cb = [](ref<window> state, u32 id, win_event event) {
-			DestroyWindow((HWND)state.windows[id].data);
+			DestroyWindow((HWND)state.windows[id].data());
 		};
 
 		add_cb(win_event::close, close_cb);
@@ -63,13 +66,12 @@ namespace jolly {
 
 	window::~window() {
 		// we stop looking through the message queue so delete manually
-		for (auto& [i, hwnd] : windows) {
+		for (auto [i, hwnd] : windows) {
 			win_destroy_cb(*this, i, win_event::destroy);
-			DestroyWindow((HWND)hwnd.data);
-			hwnd = nullptr;
+			DestroyWindow((HWND)hwnd->data());
 		}
 
-		UnregisterClassW(WNDCLASS_NAME, (HINSTANCE)handle.data);
+		UnregisterClassW(WNDCLASS_NAME, (HINSTANCE)handle.data());
 		handle = nullptr;
 	}
 
@@ -89,7 +91,7 @@ namespace jolly {
 				style,
 				CW_USEDEFAULT, CW_USEDEFAULT,
 				sz.x, sz.y,
-				NULL, NULL, (HINSTANCE)handle.data, NULL
+				NULL, NULL, (HINSTANCE)handle.data(), NULL
 				);
 
 		core::ptr<u32> data = core::ptr_create<u32>(id);
@@ -99,7 +101,7 @@ namespace jolly {
 		ShowWindow(win, SW_SHOW);
 		UpdateWindow(win);
 
-		windows[id] = core::ptr<void>((void*)win);
+		windows[id] = core::handle((void*)win);
 		callback(id, win_event::create);
 		return id;
 	}
@@ -127,8 +129,8 @@ namespace jolly {
 			VkSurfaceKHR tmp = VK_NULL_HANDLE;
 			VkWin32SurfaceCreateInfoKHR info{};
 			info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-			info.hwnd = (HWND)state.windows[id].data;
-			info.hinstance = (HINSTANCE)state.handle.data;
+			info.hwnd = (HWND)state.windows[id].data();
+			info.hinstance = (HINSTANCE)state.handle.data();
 
 			vkCreateWin32SurfaceKHR(surface.device._instance, &info, nullptr, &tmp);
 			auto& swapchain = surface.surfaces[id];
@@ -242,24 +244,23 @@ namespace jolly {
 
 	ref<vk_swapchain> window::vk_main_swapchain() const {
 		auto& _surface = surface.get();
-		return _surface.surfaces._vals[0];
+		return _surface.surfaces.get_val(0);
 	}
 
 	core::vector<cstr> window::vk_extensions(cref<core::vector<VkExtensionProperties>> extensions) const {
-		bool surface = false, win32_surface = false;
-		for (auto& extension : extensions) {
-			if (core::cmpeq(extension.extensionName, "VK_KHR_surface")) {
-				surface = true;
-			}
+		core::vector<cstr> enabled_extensions = {
+			"VK_KHR_surface",
+			"VK_KHR_win32_surface"
+		};
 
-			if (core::cmpeq(extension.extensionName, "VK_KHR_win32_surface")) {
-				win32_surface = true;
-			}
+		for (auto name : enabled_extensions) {
+			bool found = core::view::has(extensions, [name](cref<VkExtensionProperties> extension) {
+				return core::cmpeq(name, extension.extensionName);
+					});
+			JOLLY_ASSERT(found, "extension not found");
 		}
 
-		JOLLY_ASSERT(surface && win32_surface, "could not find required instance extensions");
-
-		return core::vector{ "VK_KHR_surface", "VK_KHR_win32_surface" };
+		return enabled_extensions;
 	}
 
 	void window::vsync(bool sync) {
@@ -280,10 +281,10 @@ namespace jolly {
 
 		{
 			core::lock lock(busy);
-			hwnd = (HWND)windows[id].data;
+			hwnd = (HWND)windows[id].data();
 		}
 
-		GetClientRect((HWND)windows[id].data, &area);
+		GetClientRect((HWND)windows[id].data(), &area);
 		return math::vec2i{area.right, area.bottom};
 	}
 
@@ -454,14 +455,13 @@ namespace jolly {
 		vkDestroySwapchainKHR(gpu.device, swapchain.swapchain, nullptr);
 	}
 
-	static void win_destroy_cb(ref<window> state, u32 id, win_event event) {
-		core::ptr<void> hwnd = state.windows[id];
+	void win_destroy_cb(ref<window> state, u32 id, win_event event) {
+		core::handle hwnd = state.windows[id];
 
-		RemovePropW((HWND)hwnd.data, L"state");
-		core::ptr<void> data = RemovePropW((HWND)hwnd.data, L"id");
+		RemovePropW((HWND)hwnd.data(), L"state");
+		core::ptr<void> data = RemovePropW((HWND)hwnd.data(), L"id");
 
 		state.windows.del(id);
-		hwnd = nullptr;
 
 		if (!state.windows.size) {
 			PostQuitMessage(0);

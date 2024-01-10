@@ -4,14 +4,15 @@ module;
 
 export module jolly.engine;
 import jolly.system;
+import jolly.ecs;
 import core.table;
 import core.string;
 import core.atom;
 import core.lock;
 import core.timer;
-import core.ecs;
+import core.memory;
 
-namespace jolly {
+export namespace jolly {
 	struct engine {
 		engine()
 		: _systems()
@@ -27,25 +28,24 @@ namespace jolly {
 			}
 		}
 
+		// obtain a rview/wview
 		void add(cref<core::string> name, core::ptr<system>&& sys) {
-			core::lock lock(_busy);
 			auto& s = sys.get();
 			_systems[name] = forward_data(sys);
 			s.init();
 		}
 
-		ref<system> engine::get(cref<core::string> name) const {
+		ref<system> get(cref<core::string> name) const {
 			return _systems[name].get();
 		}
 
-		void run();
-
-		void engine::run() {
+		// do not call with an owning view
+		void run() {
 			f32 dt = 0;
 
 			bool run = _run.get(core::memory_order_relaxed);
 			while (run) {
-				core::lock lock(_busy);
+				core::lock lock(_busy.read());
 				core::timer timer(dt);
 				for (auto& sys : _systems.vals()) {
 					sys->step(dt);
@@ -55,15 +55,15 @@ namespace jolly {
 			}
 		}
 
-		void engine::stop() {
+		void stop() {
 			_run.set(false, core::memory_order_relaxed);
 		}
 
-		ref<ecs> engine::get_ecs() const {
+		ref<ecs> get_ecs() {
 			return _ecs;
 		}
 
-		ref<core::rwlock> get_lock() const {
+		cref<core::rwlock> get_lock() const {
 			return _busy;
 		}
 
@@ -80,6 +80,6 @@ namespace jolly {
 		core::rwlock _busy;
 		core::atom<bool> _run;
 
-		static core::ptr<engine> _instance = nullptr;
+		static inline core::ptr<engine> _instance = nullptr;
 	};
 }

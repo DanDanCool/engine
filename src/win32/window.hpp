@@ -13,7 +13,7 @@ import core.log;
 import jolly.engine;
 import math.vec;
 
-namespace jolly {
+export namespace jolly {
 	enum class win_event {
 		close = 0,
 		destroy,
@@ -54,9 +54,9 @@ namespace jolly {
 		math::vec2i size(u32 id) const;
 		math::vec2i fbsize(u32 id) const; // size of framebuffer
 
-		core::ptr<void> handle;
+		core::handle handle;
 		core::ptr<vk_surface> surface; // stores rendering device info
-		core::table<u32, core::ptr<void>> windows;
+		core::table<u32, core::handle> windows;
 		core::vector<core::vector<pfn_win_cb>> callbacks;
 		core::mutex busy;
 	};

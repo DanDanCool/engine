@@ -12,6 +12,6 @@ export namespace core {
 		i64 start;
 		ref<f32> result;
 
-		static i64 frequency = -1;
+		static inline i64 frequency = -1;
 	};
 }

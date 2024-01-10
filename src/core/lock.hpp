@@ -65,10 +65,10 @@ export namespace core {
 		void wrelease() const;
 
 		struct lock_base {
-			lock_base(ref<rwlock> in)
+			lock_base(cref<rwlock> in)
 				: _lock(in) {}
 
-			ref<rwlock> _lock;
+			cref<rwlock> _lock;
 		};
 
 		struct read_lock: public lock_base {
@@ -103,11 +103,11 @@ export namespace core {
 			}
 		};
 
-		auto read() const {
+		read_lock read() const {
 			return read_lock(*this);
 		}
 
-		auto write() const {
+		write_lock write() const {
 			return write_lock(*this);
 		}
 
@@ -120,57 +120,77 @@ export namespace core {
 
 		view_base(ref<type> in)
 		: data(in) {
-			Impl::acquire(lock());
+			Impl::acquire(get_lock(), data);
 		}
 
 		~view_base() {
-			Impl::release(lock());
+			Impl::release(get_lock(), data);
 		}
 
 		auto operator->() const {
-			return &Impl::const_convert(data);
+			return Impl::const_convert(data);
 		}
 
-		ref<core::rwlock> lock() {
+		auto begin() const {
+			return data.begin();
+		}
+
+		auto end() const {
+			return data.end();
+		}
+
+		cref<core::rwlock> get_lock() const {
 			return data.get_lock();
 		}
 
 		ref<type> data;
 	};
 
+	template <typename T>
 	struct rview_impl {
-		static void acquire(ref<core::rwlock> l) {
+		using type = T;
+		static void acquire(cref<rwlock> l, ref<type> in) {
 			l.racquire();
 		}
 
-		static void release(ref<core::rwlock> l) {
+		static void release(cref<rwlock> l, ref<type> in) {
 			l.rrelease();
 		}
 
-		template<typename T>
-		cref<T> const_convert(ref<T> in) {
-			return static_cast<cref<T>>(in);
+		static const type* const_convert(ref<type> in) {
+			return &static_cast<cref<type>>(in);
 		}
 	};
 
+	template <typename T>
 	struct wview_impl {
-		static void acquire(ref<core::rwlock> l) {
+		using type = T;
+		static void acquire(cref<rwlock> l, ref<type> in) {
 			l.wacquire();
 		}
 
-		static void release(ref<core::rwlock> l) {
+		static void release(cref<rwlock> l, ref<type> in) {
 			l.wrelease();
 		}
 
-		template<typename T>
-		ref<T> const_convert(ref<T> in) {
-			return static_cast<ref<T>>(in);
+		static type* const_convert(ref<type> in) {
+			return &static_cast<ref<type>>(in);
 		}
 	};
 
 	template<typename T>
-	using rview = view_base<T, rview_impl>;
+	struct rview: public view_base<T, rview_impl<T>> {};
 
 	template<typename T>
-	using wview = view_base<T, wview_impl>;
+	struct wview: public view_base<T, wview_impl<T>> {};
+
+	template<typename T>
+	rview<T> rview_create(ref<T> in) {
+		return rview<T>(in);
+	}
+
+	template<typename T>
+	wview<T> wview_create(ref<T> in) {
+		return wview<T>(in);
+	}
 }

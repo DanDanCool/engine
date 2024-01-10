@@ -10,7 +10,7 @@ import core.simd;
 import core.iterator;
 import core.operations;
 
-namespace core {
+export namespace core {
 	constexpr u32 VECTOR_DEFAULT_SIZE = BLOCK_32;
 	template<typename T>
 	struct vector {
@@ -25,7 +25,12 @@ namespace core {
 
 		vector(this_type&& other)
 		: data(nullptr), reserve(0), size(0) {
-			*this = move_data(other);
+			*this = forward_data(other);
+		}
+
+		vector(cref<this_type> other)
+		: data(nullptr), reserve(0), size(0) {
+			*this = other;
 		}
 
 		vector(std::initializer_list<type> l)
@@ -47,6 +52,11 @@ namespace core {
 			other.reserve = 0;
 			other.size = 0;
 
+			return *this;
+		}
+
+		ref<this_type> operator=(cref<this_type> other) {
+			*this = forward_data(other.copy());
 			return *this;
 		}
 
@@ -90,7 +100,12 @@ namespace core {
 				resize(reserve * 2);
 			}
 
-			data[size++] = move_data(val);
+			data[size++] = forward_data(val);
+		}
+
+		// this implementation copies the argument
+		void add(cref<type> val) {
+			add(forward_data(core::copy(val)));
 		}
 
 		ref<type> add() {
@@ -117,6 +132,15 @@ namespace core {
 			}
 
 			return U32_MAX;
+		}
+
+		this_type copy() const {
+			this_type tmp(reserve);
+			for (auto& item : *this) {
+				tmp.add(item);
+			}
+
+			return tmp;
 		}
 
 		ref<type> operator[](u32 idx) const {
@@ -156,23 +180,39 @@ namespace core {
 		};
 
 		forward_iterator begin() const {
-			return forward_iterator(&data[0]);
+			return forward_iterator(*this, 0);
 		}
 
 		forward_iterator end() const {
-			return forward_iterator(&data[size]);
+			return forward_iterator(*this, size);
 		}
 
 		reverse_iterator rbegin() const {
-			return reverse_iterator(&data[size - 1]);
+			return reverse_iterator(*this, size - 1);
 		}
 
 		reverse_iterator rend() const {
-			return reverse_iterator(&data[-1]);
+			return reverse_iterator(*this, -1);
 		}
 
 		type* data;
 		u32 reserve;
 		u32 size;
+	};
+
+	template <typename T>
+	struct operations<vector<T>>: public operations_base<vector<T>> {
+		using type = T;
+		using vector_type = vector<T>;
+
+		static vector_type copy(cref<vector_type> src) {
+			return src.copy();
+		}
+
+		static void swap(ref<vector_type> a, ref<vector_type> b) {
+			vector_type tmp = forward_data(a);
+			a = forward_data(b);
+			b = forward_data(tmp);
+		}
 	};
 }

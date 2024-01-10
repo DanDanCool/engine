@@ -4,7 +4,7 @@ module;
 
 export module math.vec;
 
-namespace math {
+export namespace math {
 	template <typename T>
 	struct vec2 {
 		using type = T;

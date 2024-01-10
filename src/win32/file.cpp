@@ -9,10 +9,10 @@ module;
 module core.file;
 
 namespace core {
-	static int convert_flags(access _access);
-	static int get_fd(cref<handle> handle);
+	int convert_flags(access _access);
+	int get_fd(cref<handle> handle);
 
-	file::file(cref<string> fname, access _access)
+	file_base::file_base(cref<string> fname, access _access)
 	: handle() {
 		int fd = 0;
 		int oflag = convert_flags(_access) | _O_CREAT;
@@ -21,43 +21,44 @@ namespace core {
 		handle = (void*)(i64)fd;
 	}
 
-	file::file(file&& other)
-	: handle() {
-		*this = move_data(other);
-	}
-
-	file::~file() {
+	file_base::~file_base() {
 		if (!handle) return;
 		int fd = get_fd(handle);
 		_close(fd);
 	}
 
-	u32 file::write(memptr buf) {
+	u32 file_base::write(memptr buf) {
 		int fd = get_fd(handle);
 		int bytes = _write(fd, buf.data, (u32)buf.size);
 		return bytes;
 	}
 
-	vector<u8> file::read() {
+	u32 file_base::read(ref<vector<u8>> buf) {
 		int fd = get_fd(handle);
 
 		i32 bytes = (i32)_lseek(fd, 0, SEEK_END);
 		JOLLY_ASSERT(bytes >= 0, "file seek failed!");
-		vector<u8> buffer(bytes);
-		buffer.size = bytes;
+		buf.resize(bytes);
 		bytes = (i32)_lseek(fd, 0, SEEK_SET);
 		JOLLY_ASSERT(bytes >= 0, "file seek failed!");
-		_read(fd, buffer.data, buffer.size);
+		bytes = _read(fd, buf.data, buf.size);
 
-		return move_data(buffer);
+		return bytes;
 	}
 
-	void file::flush() {
+	u32 file_base::read(ref<buffer> buf) {
+		int fd = get_fd(handle);
+		int bytes = _read(fd, buf.data + buf.index, (u32)(buffer::size - buf.index));
+		buf.index += bytes;
+		return bytes;
+	}
+
+	void file_base::flush() {
 		int fd = get_fd(handle);
 		_commit(fd);
 	}
 
-	static int convert_flags(access _access) {
+	int convert_flags(access _access) {
 		int read = 0;
 		read |= cast<bool>(_access & access::ro) ? _O_RDONLY : 0;
 		read |= cast<bool>(_access & access::wo) ? _O_WRONLY : 0;
@@ -69,7 +70,7 @@ namespace core {
 		return oflag;
 	}
 
-	static int get_fd(cref<ptr<void>> handle) {
-		return (int)(i64)handle.data;
+	int get_fd(cref<handle> handle) {
+		return (int)(i64)handle.data();
 	}
 }

@@ -1,5 +1,6 @@
 module;
 
+#include <core/core.h>
 #include <intrin.h>
 
 module core.atom;
@@ -21,11 +22,11 @@ module core.atom;
 
 #define ADD_OP_i32(obj, arg) \
 	static_assert(sizeof(obj.data) == sizeof(i32)); \
-	i32 tmp = _InterlockedExchangeAdd((i32*)&obj.data, arg)
+	i32 tmp = _InterlockedExchangeAdd((long*)&obj.data, arg)
 
 #define ADD_OP_i64(obj, arg) \
-	static_assert(sizeof(obj.data) == sizeof(i8)); \
-	i8 tmp = _InterlockedExchangeAdd8((i8*)&obj.data, arg)
+	static_assert(sizeof(obj.data) == sizeof(i64)); \
+	i64 tmp = _InterlockedExchangeAdd64((i64*)&obj.data, arg)
 
 #define ADD_OP_u8(obj, arg) ADD_OP_i8(obj, arg)
 #define ADD_OP_u16(obj, arg) ADD_OP_i16(obj, arg)

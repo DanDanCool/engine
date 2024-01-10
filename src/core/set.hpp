@@ -1,12 +1,16 @@
 module;
 
 #include <initializer_list>
+#include "core.h"
 
 export module core.set;
 import core.iterator;
 import core.table;
+import core.vector;
+import core.operations;
+import core.traits;
 
-namespace core {
+export namespace core {
 	template <typename T>
 	struct set {
 		using type = T;
@@ -45,8 +49,8 @@ namespace core {
 		void resize(u32 sz) {
 			sz = table_size(sz);
 
-			vector<u32> nhash = _hash;
-			vector<type> nkeys = _keys;
+			vector<u32> nhash = forward_data(_hash);
+			vector<type> nkeys = forward_data(_keys);
 
 			_hash = vector<u32>(sz);
 			_keys = vector<type>(sz);

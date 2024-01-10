@@ -12,22 +12,23 @@ import core.log;
 import core.set;
 import core.file;
 import core.view;
+import core.iterator;
 import math.vec;
 import vulkan.surface;
 import win32.window;
 
+constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
+
+VKAPI_ATTR VkBool32 VKAPI_CALL vkdebugcb(
+	VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+	VkDebugUtilsMessageTypeFlagsEXT type,
+	const VkDebugUtilsMessengerCallbackDataEXT* cbdata,
+	void* userdata) {
+	LOG_INFO("vulkan: %", cbdata->pMessage);
+	return VK_FALSE;
+}
+
 export namespace jolly {
-	static VKAPI_ATTR VkBool32 VKAPI_CALL vkdebugcb(
-		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-		VkDebugUtilsMessageTypeFlagsEXT type,
-		const VkDebugUtilsMessengerCallbackDataEXT* cbdata,
-		void* userdata) {
-		LOG_INFO("vulkan: %", cbdata->pMessage);
-		return VK_FALSE;
-	}
-
-	constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
-
 	enum class vertex_data {
 		vec2,
 		vec3,
@@ -85,7 +86,7 @@ export namespace jolly {
 		}
 
 		// needs explicit destruction
-		void vk_cmdpool::destroy(cref<vk_gpu> gpu) {
+		void destroy(cref<vk_gpu> gpu) {
 			vkDestroyCommandPool(gpu.device, pool, nullptr);
 		}
 
@@ -109,13 +110,12 @@ export namespace jolly {
 			busy.add({buffer, fence});
 		}
 
-
 		void gc(cref<vk_gpu> gpu) {
 			for (i32 i : core::range(busy.size, 0, -1)) {
 				i = i - 1;
-				auto [buffer, fence] = busy[i];
+				auto& [buffer, fence] = busy[i];
 				if (vkGetFenceStatus(gpu.device, fence) == VK_SUCCESS) {
-					free.add(buffer);
+					free.add(forward_data(buffer));
 					busy.del(i);
 				}
 			}
@@ -348,7 +348,7 @@ export namespace jolly {
 
 			_window->vk_swapchain_create();
 			core::vector<binding_description> bindings{
-				binding_description( core::vector<vertex_attribute>{ {vertex_data::vec2, 0}, {vertex_data::vec3, 1} }, vertex_input::vertex ),
+				binding_description( forward_data(core::vector<vertex_attribute>{ {vertex_data::vec2, 0}, {vertex_data::vec3, 1} }), vertex_input::vertex ),
 			};
 
 			auto& gpu = main_gpu();
@@ -391,21 +391,21 @@ export namespace jolly {
 		void pipeline(cref<core::string> fname, cref<core::vector<binding_description>> layout) {
 			auto& gpu = main_gpu();
 
-			auto fvertex = core::fopen(core::format_string("%.vert.spv", fname).data, core::access::ro);
+			core::file fvertex = core::fopen(core::format_string("%.vert.spv", fname), core::access::ro);
 			auto vbuf = fvertex.read();
 
 			VkShaderModuleCreateInfo vinfo{};
 			vinfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			vinfo.codeSize = vbuf.size;
-			vinfo.pCode = (u32*)vbuf.data;
+			//vinfo.codeSize = vbuf.size;
+			//vinfo.pCode = (u32*)vbuf.data;
 
-			auto ffragment = core::fopen(core::format_string("%.frag.spv", fname).data, core::access::ro);
+			auto ffragment = core::fopen(core::format_string("%.frag.spv", fname), core::access::ro);
 			auto fbuf = ffragment.read();
 
 			VkShaderModuleCreateInfo finfo{};
 			finfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			finfo.codeSize = fbuf.size;
-			finfo.pCode = (u32*)fbuf.data;
+			//finfo.codeSize = fbuf.size;
+			//finfo.pCode = (u32*)fbuf.data;
 
 			VkShaderModule vmodule = VK_NULL_HANDLE, fmodule = VK_NULL_HANDLE;
 			vkCreateShaderModule(gpu.device, &vinfo, nullptr, &vmodule);
@@ -464,7 +464,7 @@ export namespace jolly {
 				core::vector<VkVertexInputAttributeDescription> attributes(0);
 				for (u32 i : core::range(layout.size)) {
 					u32 stride = 0;
-					for (auto [data, location] : layout[i].one) {
+					for (auto& [data, location] : layout[i].one) {
 						auto [format, size] = vk_vertex_data_format(data);
 						auto& attribute = attributes.add();
 						attribute.binding = i;
@@ -479,7 +479,7 @@ export namespace jolly {
 					binding.inputRate = vk_vertex_input_rate(layout[i].two);
 				}
 
-				return core::pair{ bindings, attributes };
+				return core::pair{ forward_data(bindings), forward_data(attributes) };
 			};
 
 			auto [ bindings, attributes ] = parse_layout(layout);

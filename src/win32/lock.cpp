@@ -1,7 +1,9 @@
 module;
 
+#include <core/core.h>
 #include <windows.h>
 #include <process.h>
+#include <synchapi.h>
 
 module core.lock;
 
@@ -13,31 +15,31 @@ namespace core {
 
 	mutex::mutex(mutex&& other)
 	: handle() {
-		*this = move_data(other);
+		*this = forward_data(other);
 	}
 
 	mutex::~mutex() {
 		if (!handle) return;
-		CloseHandle((HANDLE)handle);
+		CloseHandle((HANDLE)handle.data());
 	}
 
 	ref<mutex> mutex::operator=(mutex&& other) {
-		handle = move_data(other.handle);
+		handle = forward_data(other.handle);
 		other.handle = nullptr;
 		return *this;
 	}
 
 	bool mutex::tryacquire() const {
-		DWORD res = WaitForSingleObject((HANDLE)handle.data, 0);
+		DWORD res = WaitForSingleObject((HANDLE)handle.data(), 0);
 		return !(res == WAIT_TIMEOUT);
 	}
 
 	void mutex::acquire() const {
-		WaitForSingleObject((HANDLE)handle.data, INFINITE);
+		WaitForSingleObject((HANDLE)handle.data(), INFINITE);
 	}
 
 	void mutex::release() const {
-		ReleaseMutex((HANDLE)handle.data);
+		ReleaseMutex((HANDLE)handle.data());
 	}
 
 	semaphore::semaphore(u32 max, u32 count)
@@ -47,36 +49,36 @@ namespace core {
 
 	semaphore::semaphore(semaphore&& other)
 	: handle() {
-		*this = move_data(other);
+		*this = forward_data(other);
 	}
 
 	semaphore::~semaphore() {
 		if (!handle) return;
-		CloseHandle((HANDLE)handle.data);
+		CloseHandle((HANDLE)handle.data());
 	}
 
 	ref<semaphore> semaphore::operator=(semaphore&& other) {
-		handle = move_data(other.handle);
+		handle = forward_data(other.handle);
 		other.handle = nullptr;
 		return *this;
 	}
 
 	bool semaphore::tryacquire() const {
-		DWORD res = WaitForSingleObject((HANDLE)handle.data, 0);
+		DWORD res = WaitForSingleObject((HANDLE)handle.data(), 0);
 		return !(res == WAIT_TIMEOUT);
 	}
 
 	void semaphore::acquire() const {
-		WaitForSingleObject((HANDLE)handle.data, INFINITE);
+		WaitForSingleObject((HANDLE)handle.data(), INFINITE);
 	}
 
 	void semaphore::release() const {
-		ReleaseSemaphore((HANDLE)handle.data, 1, NULL);
+		ReleaseSemaphore((HANDLE)handle.data(), 1, NULL);
 	}
 
 	rwlock::rwlock()
 	: handle() {
-		SRWLock* lock = (SRWLock*)alloc8((u32)sizeof(SRWLock));
+		SRWLOCK* lock = (SRWLOCK*)alloc8((u32)sizeof(SRWLOCK)).data;
 		InitializeSRWLock(lock);
 		handle = (void*)lock;
 	}
@@ -98,38 +100,26 @@ namespace core {
 	}
 
 	bool rwlock::tryracquire() const {
-		return TryAcquireSWRLockShared((SRWLock*)handle.data);
+		return TryAcquireSRWLockShared((SRWLOCK*)handle.data);
 	}
 
 	bool rwlock::trywacquire() const {
-		return TryAcquireSWRLockExclusive((SRWLock*)handle.data);
+		return TryAcquireSRWLockExclusive((SRWLOCK*)handle.data);
 	}
 
 	void rwlock::racquire() const {
-		AcquireSRWLockShared((SRWLock*)handle.data);
+		AcquireSRWLockShared((SRWLOCK*)handle.data);
 	}
 
-	void rwlock::rrlease() const {
-		ReleaseSWRLockShared((SRWLock*)handle.data);
+	void rwlock::rrelease() const {
+		ReleaseSRWLockShared((SRWLOCK*)handle.data);
 	}
 
 	void rwlock::wacquire() const {
-		AcquireSRWLockExclusive((SRWLock*)handle.data);
+		AcquireSRWLockExclusive((SRWLOCK*)handle.data);
 	}
 
 	void rwlock::wrelease() const {
-		ReleaseSRWLockExclusive((SWRLock*)handle.data);
-	}
-
-	bool rwlock::tryacquire() const {
-		return trywacquire();
-	}
-
-	void rwlock::acquire() const {
-		wacquire();
-	}
-
-	void rwlock::release() const {
-		wrelease();
+		ReleaseSRWLockExclusive((SRWLOCK*)handle.data);
 	}
 }

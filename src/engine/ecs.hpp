@@ -7,20 +7,14 @@ import core.vector;
 import core.simd;
 import core.tuple;
 import core.lock;
+import core.traits;
+import core.iterator;
 
 namespace impl_ecs {
-	template <typename S, typename View>
+	template <typename S>
 	struct iterator {
-		iterator(cref<S> in, u32 idx, bool b)
-		: data(in), index(idx), should_lock(b) {
-			if (should_lock)
-				View::acquire(data.busy);
-		}
-
-		~iterator() {
-			if (should_lock)
-				View::release(data.busy);
-		}
+		iterator(cref<S> in, u32 idx)
+		: data(in), index(idx) {}
 
 		bool operator!=(cref<iterator> other) const {
 			return index != other.index;
@@ -33,7 +27,6 @@ namespace impl_ecs {
 
 		cref<S> data;
 		u32 index;
-		bool should_lock;
 	};
 
 	template <typename S, typename Iterator>
@@ -42,11 +35,11 @@ namespace impl_ecs {
 		: data(in) {}
 
 		Iterator begin() const {
-			return Iterator(data, 0, true);
+			return Iterator(data, 0);
 		}
 
 		Iterator end() const {
-			return Iterator(data, data.dense.size, false);
+			return Iterator(data, data.dense.size);
 		}
 
 		cref<S> data;
@@ -76,12 +69,12 @@ export namespace jolly {
 	struct sparse_set {
 		sparse_set()
 		: sparse(0)
-		: dense(0) {
+		, dense(0) {
 			core::set256(U32_MAX, bytes(sparse[0]), sparse.reserve);
 			core::set256(U32_MAX, bytes(dense[0]), sparse.reserve);
 		}
 
-		~group() = default;
+		~sparse_set() = default;
 
 		u32 index(e_id e) const {
 			if (e.id() >= sparse.reserve) return U32_MAX;
@@ -109,20 +102,19 @@ export namespace jolly {
 
 		void del(e_id e) {
 			JOLLY_ASSERT(has(e), "entity does not contain this component");
-			u32 index = index(e);
+			u32 idx = index(e);
 
-			dense.del(index);
+			dense.del(idx);
 			dense[dense.size]._id = U32_MAX;
 
 			sparse[e.id()] = U32_MAX;
 
-			if (dense[index]._id != U32_MAX) {
-				sparse[dense[index].id()] = index;
+			if (dense[idx]._id != U32_MAX) {
+				sparse[dense[idx].id()] = idx;
 			}
 		}
 
 		bool has(e_id e) const {
-			core::lock lock(busy.read())
 			return index(e) != U32_MAX;
 		}
 
@@ -138,10 +130,7 @@ export namespace jolly {
 		pool()
 		: set()
 		, components(0)
-		, busy() {
-			core::set256(U32_MAX, bytes(sparse[0]), sparse.reserve);
-			core::set256(U32_MAX, bytes(dense[0]), sparse.reserve);
-		}
+		, busy() {}
 
 		~pool() = default;
 
@@ -173,41 +162,49 @@ export namespace jolly {
 			return components[set.index(e)];
 		}
 
-		ref<core::rwlock> get_lock() const {
+		cref<core::rwlock> get_lock() const {
 			return busy;
 		}
 
-		template <typename View>
-		struct iterator: public impl_ecs::iterator<this_type, View> {
+		struct iterator: public impl_ecs::iterator<this_type> {
+			using parent_type = impl_ecs::iterator<this_type>;
 			using pair_type = core::pair<e_id, ref<type>>;
+
+			using parent_type::parent_type;
+
 			pair_type operator*() const {
+				u32 index = parent_type::index;
+				auto& data = parent_type::data;
 				return pair_type(data.set.dense[index], data.components[index]);
 			}
 		};
 
-		auto rview() const {
-			return impl_ecs::view_base<this_type, iterator<core::rview_impl>>(*this);
+		auto begin() const {
+			return iterator(*this, 0);
 		}
 
-		auto wview() const {
-			return impl_ecs::view_base<this_type, iterator<core::wview_impl>>(*this);
+		auto end() const {
+			return iterator(*this, set.dense.size);
 		}
 
 		sparse_set set;
 		core::vector<type> components;
 		core::rwlock busy;
 
-		static u32 index = U32_MAX;
+		static inline u32 index = U32_MAX;
 	};
 
 	struct ecs;
+
+	template<typename T>
+	cref<core::rwlock> get_view_lock(cref<ecs> state);
 
 	// we choose not to cache pointers as it is expensive
 	template <typename... Ts>
 	struct group {
 		using this_type = group<Ts...>;
 		using tuple_type = core::tuple<Ts&...>;
-		using sequence_type = index_sequential<sizeof...(Ts)>;
+		using sequence_type = core::index_sequential<sizeof...(Ts)>;
 
 		group(ref<ecs> in)
 		: set()
@@ -223,7 +220,7 @@ export namespace jolly {
 
 		void del(e_id e) {
 			JOLLY_ASSERT(has(e), "entity does not contain this component");
-			set.del(e)
+			set.del(e);
 		}
 
 		bool has(e_id e) const {
@@ -235,57 +232,59 @@ export namespace jolly {
 			return tuple_type(state.get<Ts>(e)...);
 		}
 
-		ref<core::rwlock> get_lock() const {
+		cref<core::rwlock> get_lock() const {
 			return busy;
 		}
 
-		template<typename View>
-		struct iterator: public impl_ecs::iterator<this_type, View> {
-			using pair_type = core::pair<e_id, tuple_type>;
-			iterator(cref<this_type> in, u32 idx, bool b)
-			: impl_ecs::iterator(in, idx, b) {
-				auto helper = [](ref<core::rwlock> l) {
-					View::acquire(l);
+		template <typename Impl>
+		struct view_impl: public Impl {
+			static void acquire(cref<core::rwlock> l, ref<this_type> in) {
+				auto helper = [](cref<core::rwlock> l, ref<this_type> in) {
+					Impl::acquire(l, in);
 					return 0;
 				};
 
-				if (should_lock) {
-					core::swallow(helper(data.state.view<Ts>().get_lock())...);
-				}
+				Impl::acquire(l, in);
+				core::swallow(helper(get_view_lock(in.state), in)...);
 			}
 
-			~iterator() {
-				auto helper = [](ref<core::rwlock> l) {
-					View::release(l);
+			static void release(cref<core::rwlock> l, ref<this_type> in) {
+				auto helper = [](cref<core::rwlock> l, ref<this_type> in) {
+					Impl::release(l, in);
 					return 0;
 				};
 
-				if (should_lock) {
-					core::swallow(helper(data.state.view<Ts>().get_lock())...);
-				}
-
-				impl_ecs::~iterator();
-			}
-
-			pair_type operator*() const {
-				e_id id = data.set.dense[index];
-				return pair_type(id, tuple_type(data.get(id));
+				Impl::release(l, in);
+				core::swallow(helper(get_view_lock(in.state), in)...);
 			}
 		};
 
-		auto read() const {
-			return impl_ecs::view_base<this_type, iterator<impl_ecs::read_view>>();
+		struct iterator: public impl_ecs::iterator<this_type> {
+			using parent_type = impl_ecs::iterator<this_type>;
+			using pair_type = core::pair<e_id, tuple_type>;
+
+			using parent_type::parent_type;
+
+			pair_type operator*() const {
+				auto& data = parent_type::data;
+				e_id id = data.set.dense[index];
+				return pair_type(id, tuple_type(data.get(id)));
+			}
+		};
+
+		auto begin() const {
+			return iterator(*this, 0);
 		}
 
-		auto write() const {
-			return impl_ecs::view_base<this_type, iterator<impl_ecs::write_view>>();
+		auto end() const {
+			return iterator(*this, set.dense.size);
 		}
 
 		sparse_set set;
 		ref<ecs> state;
 		core::rwlock busy;
 
-		static u32 index = U32_MAX;
+		static inline u32 index = U32_MAX;
 		static u32 bitset() {
 			return ((1 << pool<Ts>::index) | ...);
 		}
@@ -324,7 +323,6 @@ export namespace jolly {
 		e_id create() {
 			e_id entity{U32_MAX};
 			if (free == U32_MAX) {
-				core::lock lock(busy);
 				u32 id = entities.size;
 
 				e_id& e = entities.add();
@@ -333,7 +331,6 @@ export namespace jolly {
 				e._id = id; // generation = 0
 				entity = e;
 			} else {
-				core::lock lock(busy);
 				u32 id = free;
 				e_id& e = entities[free];
 				free = e.id() == (U32_MAX & e_id::id_mask) ? U32_MAX : e.id();
@@ -358,13 +355,13 @@ export namespace jolly {
 			}
 		}
 
-		void ecs::add_cb(ecs_event event, pfn_ecs_cb cb) {
+		void add_cb(ecs_event event, pfn_ecs_cb cb) {
 			auto& vec = callbacks[(u32)event];
 			if (!vec.data) {
 				vec = core::vector<pfn_ecs_cb>(0);
 			}
 
-			vec.add(cb);
+			vec.add(forward_data(cb));
 		}
 
 		template<typename T>
@@ -388,7 +385,7 @@ export namespace jolly {
 			auto& group_info = groups.add();
 			group_info.one = core::ptr_create<group<Ts...>>();
 			group_info.two = group<Ts...>::bitset();
-			auto& g = group_info.one.get<group<T...>>();
+			auto& g = group_info.one.get<group<Ts...>>();
 
 			for (u32 i : core::range(bitset.size)) {
 				if ((bitset[i] & group_info.two) == group_info.two) {
@@ -404,7 +401,7 @@ export namespace jolly {
 			};
 
 			auto entity_del_cb = [](ref<ecs> state, e_id e, ecs_event event) {
-				auto& g = state.group<T...>();
+				auto& g = state.group<Ts...>();
 				u64 bits = state.groups[group<Ts...>::index].two;
 				if (g.has(e) && (state.bitset[e.id()] & bits) != bits) {
 					g.del(e);
@@ -419,22 +416,29 @@ export namespace jolly {
 		template<typename T>
 		void add(e_id e, T&& item) {
 			{
-				auto pool = core::wview(view<T>());
+				auto pool = core::wview_create(view<T>());
 				pool->add(e, forward_data(item));
 			}
 
-			bitset[e.id()] |= 1 << (pool<T>::index);
+			u32 bits = (u32)(1 << (pool<T>::index));
+			bitset[e.id()] |= bits;
 			callback(e, ecs_event::add);
-			return tmp;
+		}
+
+		template<typename T>
+		void add(e_id e, cref<T> item) {
+			add(e, forward_data(core::copy(item)));
 		}
 
 		template<typename T>
 		void del(e_id e) {
 			{
-				auto pool = core::wview(view<T>());
+				auto pool = core::wview_create(view<T>());
 				pool->del(e);
 			}
-			bitset[e.id()] &= ~(1 << pool<T>::index);
+
+			u32 bits = (u32)(1 << pool<T>::index);
+			bitset[e.id()] &= ~bits;
 			callback(e, ecs_event::del);
 		}
 
@@ -442,17 +446,17 @@ export namespace jolly {
 		// these are safe (do not require user synchronization) to use while inside a locking pool iterator
 		template<typename T>
 		ref<T> get(e_id e) const {
-			auto pool = core::rview(view<T>());
+			auto pool = core::rview_create(view<T>());
 			return pool->get(e);
 		}
 
-		ref<core::rwlock> get_lock() const {
+		cref<core::rwlock> get_lock() const {
 			return busy;
 		}
 
 		template<typename T>
 		bool has(e_id e) const {
-			auto& pool = core::rview(view<T>());
+			auto& pool = core::rview_create(view<T>());
 			return pool->has(e);
 		}
 
@@ -469,15 +473,15 @@ export namespace jolly {
 		}
 
 		template<typename... Ts>
-		ref<group<Ts...>> group() {
-			if (group<Ts...>::index == U32_MAX)
+		ref<jolly::group<Ts...>> group() {
+			if (jolly::group<Ts...>::index == U32_MAX)
 				register_group<Ts...>();
-			return groups[group<Ts...>::index].one.get<group<Ts...>>();
+			return groups[jolly::group<Ts...>::index].one.get<jolly::group<Ts...>>();
 		}
 
 		template<typename... Ts>
-		ref<group<Ts...>> group() const {
-			return groups[group<Ts...>::index].one.get<group<Ts...>>();
+		ref<jolly::group<Ts...>> group() const {
+			return groups[jolly::group<Ts...>::index].one.get<jolly::group<Ts...>>();
 		}
 
 		core::vector<e_id> entities;
@@ -489,4 +493,27 @@ export namespace jolly {
 
 		u32 free;
 	};
+
+	template <typename T>
+	cref<core::rwlock> get_view_lock(cref<ecs> state) {
+		auto& view = state.view<T>();
+		return view.get_lock();
+	}
+}
+
+template <typename... Ts>
+using group_t = jolly::group<Ts...>;
+
+template <typename... Ts>
+using rview_impl_t = group_t<Ts...>::view_impl<core::rview_impl<group_t<Ts...>>>;
+
+template <typename... Ts>
+using wview_impl_t = group_t<Ts...>::view_impl<core::wview_impl<group_t<Ts...>>>;
+
+export namespace core {
+	template<typename... Ts>
+	struct rview<group_t<Ts...>>: public view_base<group_t<Ts...>, rview_impl_t<Ts...>> {};
+
+	template<typename... Ts>
+	struct wview<group_t<Ts...>>: public view_base<group_t<Ts...>, wview_impl_t<Ts...>> {};
 }

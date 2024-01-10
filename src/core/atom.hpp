@@ -20,7 +20,7 @@ void add(type data, order) { \
 }
 
 #define ATOM_DEFINE_SUB(order) \
-void add(type data, order) { \
+void sub(type data, order) { \
 	atomic_sub<type, order>(*this, data); \
 }
 
@@ -55,52 +55,47 @@ export namespace core {
 	template<typename T, typename order>
 	void atomic_store(ref<atom_base<T>> obj, T data);
 
+	template<typename T, typename order>
+	void atomic_add(ref<atom_base<T>> obj, T arg);
+
+	template<typename T, typename order>
+	void atomic_sub(ref<atom_base<T>> obj, T arg);
+
 	template<typename T, typename success, typename failure>
 	bool atomic_cmpxchg(ref<atom_base<T>> obj, ref<T> expected, T desired);
 
 	template <typename T>
 	struct atom : public atom_base<T> {
 		using type = T;
-		using atom_base::atom_base;
+		using parent_type = atom_base<T>;
+		using parent_type::parent_type;
 
 		template<typename order>
-		type get(order) const {
-			static_assert(false);
-			return atom_base::data;
-		}
+		type get(order) const = delete;
 
 		ATOM_DEFINE_GET(_memory_order_relaxed);
 		ATOM_DEFINE_GET(_memory_order_acquire);
 
 		template<typename order>
-		void set(type data, order) {
-			static_assert(false);
-		}
+		void set(type data, order) = delete;
 
 		ATOM_DEFINE_SET(_memory_order_relaxed);
 		ATOM_DEFINE_SET(_memory_order_release);
 
 		template <typename order>
-		void add(type arg, order) {
-			static_assert(false);
-		}
+		void add(type arg, order) = delete;
 
 		ATOM_DEFINE_ADD(_memory_order_relaxed);
 		ATOM_DEFINE_ADD(_memory_order_release);
 
 		template <typename order>
-		void sub(type arg, order) {
-			static_assert(false);
-		}
+		void sub(type arg, order) = delete;
 
 		ATOM_DEFINE_SUB(_memory_order_relaxed);
 		ATOM_DEFINE_SUB(_memory_order_release);
 
 		template<typename success, typename failure>
-		bool cmpxchg(ref<type> expected, type desired, success, failure) {
-			static_assert(false);
-			return false;
-		}
+		bool cmpxchg(ref<type> expected, type desired, success, failure) = delete;
 
 		ATOM_DEFINE_CMPXCHG(_memory_order_relaxed, _memory_order_relaxed);
 		ATOM_DEFINE_CMPXCHG(_memory_order_relaxed, _memory_order_release);

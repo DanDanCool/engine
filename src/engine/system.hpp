@@ -21,27 +21,25 @@ export namespace jolly {
 		virtual ~system_thread() = default;
 
 		virtual void init() {
-			auto start = [](ref<core::thread> _, core::ptr<void> args) {
+			auto start = [](ref<core::thread> _, core::ptr<void>&& args) {
 				auto sys = args.cast<system_thread>();
 				sys->run();
 				sys = nullptr;
 				return 0;
 			};
 
-			thread = core::thread(start, core::ptr<void>((void*)this));
+			thread = core::thread((core::pfn_thread)start, core::ptr<void>((void*)this));
 		}
 
-		virtual void system_thread::term() {
+		virtual void term() {
 			thread.join();
 		}
 
-		void yield();
-
-		void system_thread::yield() {
+		void yield() {
 			thread.yield();
 		}
 
-		void system_thread::sleep(int ms) {
+		void sleep(int ms) {
 			thread.sleep(ms);
 		}
 

@@ -14,27 +14,29 @@ export namespace core {
 
 	template <typename T>
 	struct forward : public adaptor<T> {
-		forward(cref<T> in) : adaptor(in) {}
+		using parent_type = adaptor<T>;
+		forward(cref<T> in) : parent_type(in) {}
 
 		auto begin() const {
-			return data.begin();
+			return parent_type::data.begin();
 		}
 
 		auto end() const {
-			return data.end();
+			return parent_type::data.end();
 		}
 	};
 
 	template <typename T>
 	struct reverse : public adaptor<T> {
-		reverse(cref<T> in) : adaptor(in) {}
+		using parent_type = adaptor<T>;
+		reverse(cref<T> in) : parent_type(in) {}
 
 		auto begin() const {
-			return data.rbegin();
+			return parent_type::data.rbegin();
 		}
 
 		auto end() const {
-			return data.rend();
+			return parent_type::data.rend();
 		}
 	};
 
@@ -47,7 +49,7 @@ export namespace core {
 
 		struct iterator {
 			iterator(u32 idx, u32 inc)
-			: index(_idx), increment(_inc) {}
+			: index(idx), increment(inc) {}
 
 			iterator& operator++() {
 				index += increment;

@@ -1,6 +1,6 @@
 export module core.scheduler;
 
-namespace core {
+export namespace core {
 	struct scheduler {
 		scheduler();
 		~scheduler();

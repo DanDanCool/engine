@@ -21,9 +21,17 @@ export namespace jolly {
 	// ui.grid(4, 2);
 	// if (ui.button("hello")) do something
 	struct ui_context {
-		void grid();
-		void justify();
-		bool button(cref<core::string> name);
+		void grid() {
+
+		}
+
+		void justify() {
+
+		}
+
+		bool button(cref<core::string> name) {
+			return false;
+		}
 	};
 
 	struct ui_defaults {

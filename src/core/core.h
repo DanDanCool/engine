@@ -150,6 +150,4 @@ namespace assert {
 #define LOG_WARN(...) core::logger::instance().warn(core::format_string(__VA_ARGS__))
 #define LOG_CRIT(...) core::logger::instance().crit(core::format_string(__VA_ARGS__))
 
-#define move_data(...) static_cast<core::raw_type_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
 #define forward_data(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
-

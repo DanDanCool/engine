@@ -6,10 +6,13 @@ from pathlib import Path
 jmake.setupenv()
 
 workspace = jmake.Workspace("engine")
+workspace.lang = 'cpp20'
 
 engine = jmake.Project("engine", jmake.Target.EXECUTABLE)
-files = jmake.glob('src', '**/*.cpp') + jmake.glob('src', '**/*.h')
+files = jmake.glob('src', '**/*.cpp')
 engine.add(jmake.fullpath(files))
+modules = jmake.glob('src', '**/*.hpp')
+engine.add_module(jmake.fullpath(modules), True)
 
 engine.include(jmake.fullpath('src'))
 
@@ -17,10 +20,10 @@ debug = engine.filter("debug")
 debug["debug"] = True
 
 test = jmake.Project("test", jmake.Target.EXECUTABLE)
-files = jmake.glob('src', '**/*.cpp') + jmake.glob('src', '**/*.h')
 files.remove(jmake.fullpath('src/main.cpp')[0])
 files = files + jmake.glob('test', '**/*.cpp') + jmake.glob('test', '**/*.h')
 test.add(jmake.fullpath(files))
+test.add_module(jmake.fullpath(modules))
 
 test.include(jmake.fullpath('src'))
 debug = test.filter("debug")
@@ -33,7 +36,7 @@ if host.os == jmake.Platform.WIN32:
     test.define('JOLLY_WIN32', 1)
     test.define('WIN32_LEAN_AND_MEAN', 1)
 
-vulkan = jmake.package("builtin/vulkan")
+vulkan = jmake.builtin('vulkan')
 engine.depend(vulkan)
 test.depend(vulkan)
 

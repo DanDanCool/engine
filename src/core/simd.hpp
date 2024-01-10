@@ -40,10 +40,6 @@ export namespace core {
 		}
 	}
 
-	void zero256(u8* dst, u32 bytes) {
-		set256(0, dst, bytes);
-	}
-
 	void set256(u32 src, u8* dst, u32 bytes) {
 		JOLLY_ASSERT((bytes % BLOCK_32) == 0, "bytes must be a multiple of 32");
 		u32 count = bytes / BLOCK_32;
@@ -52,6 +48,10 @@ export namespace core {
 			_mm256_store_si256((__m256i*)dst, zero);
 			dst += BLOCK_32;
 		}
+	}
+
+	void zero256(u8* dst, u32 bytes) {
+		set256(0, dst, bytes);
 	}
 
 	bool cmp256(u8* src, u8* dst, u32 bytes) {
