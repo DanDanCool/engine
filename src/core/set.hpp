@@ -9,6 +9,7 @@ import core.table;
 import core.vector;
 import core.operations;
 import core.traits;
+import core.simd;
 
 export namespace core {
 	template <typename T>

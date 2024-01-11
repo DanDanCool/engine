@@ -168,7 +168,7 @@ export namespace jolly {
 
 		struct iterator: public impl_ecs::iterator<this_type> {
 			using parent_type = impl_ecs::iterator<this_type>;
-			using pair_type = core::pair<e_id, ref<type>>;
+			using pair_type = core::pair<e_id, core::wref<type>>;
 
 			using parent_type::parent_type;
 
@@ -191,7 +191,7 @@ export namespace jolly {
 		core::vector<type> components;
 		core::rwlock busy;
 
-		static inline u32 index = U32_MAX;
+		static inline u64 index = U64_MAX;
 	};
 
 	struct ecs;
@@ -203,7 +203,7 @@ export namespace jolly {
 	template <typename... Ts>
 	struct group {
 		using this_type = group<Ts...>;
-		using tuple_type = core::tuple<Ts&...>;
+		using tuple_type = core::tuple<core::wref<Ts>...>;
 		using sequence_type = core::index_sequential<sizeof...(Ts)>;
 
 		group(ref<ecs> in)
@@ -266,9 +266,10 @@ export namespace jolly {
 			using parent_type::parent_type;
 
 			pair_type operator*() const {
+				u32 index = parent_type::index;
 				auto& data = parent_type::data;
 				e_id id = data.set.dense[index];
-				return pair_type(id, tuple_type(data.get(id)));
+				return pair_type(id, data.get(id));
 			}
 		};
 
@@ -284,8 +285,8 @@ export namespace jolly {
 		ref<ecs> state;
 		core::rwlock busy;
 
-		static inline u32 index = U32_MAX;
-		static u32 bitset() {
+		static inline u64 index = U64_MAX;
+		static u64 bitset() {
 			return ((1 << pool<Ts>::index) | ...);
 		}
 	};
@@ -381,11 +382,11 @@ export namespace jolly {
 
 		template<typename... Ts>
 		void register_group() {
-			group<Ts...>::index = groups.size;
+			jolly::group<Ts...>::index = groups.size;
 			auto& group_info = groups.add();
-			group_info.one = core::ptr_create<group<Ts...>>();
-			group_info.two = group<Ts...>::bitset();
-			auto& g = group_info.one.get<group<Ts...>>();
+			group_info.one = core::ptr_create<jolly::group<Ts...>>(*this);
+			group_info.two = jolly::group<Ts...>::bitset();
+			auto& g = group_info.one.get<jolly::group<Ts...>>();
 
 			for (u32 i : core::range(bitset.size)) {
 				if ((bitset[i] & group_info.two) == group_info.two) {
@@ -394,16 +395,18 @@ export namespace jolly {
 			}
 
 			auto entity_add_cb = [](ref<ecs> state, e_id e, ecs_event event) {
-				u64 bits = state.groups[group<Ts...>::index].two;
+				u64 bits = state.groups[(u32)jolly::group<Ts...>::index].two;
 				if ((state.bitset[e.id()] & bits) == bits) {
+					auto& g = state.group<Ts...>();
 					g.add(e);
 				}
 			};
 
 			auto entity_del_cb = [](ref<ecs> state, e_id e, ecs_event event) {
 				auto& g = state.group<Ts...>();
-				u64 bits = state.groups[group<Ts...>::index].two;
+				u64 bits = state.groups[(u32)jolly::group<Ts...>::index].two;
 				if (g.has(e) && (state.bitset[e.id()] & bits) != bits) {
+					auto& g = state.group<Ts...>();
 					g.del(e);
 				}
 			};
@@ -420,7 +423,7 @@ export namespace jolly {
 				pool->add(e, forward_data(item));
 			}
 
-			u32 bits = (u32)(1 << (pool<T>::index));
+			u64 bits = (u64)1 << pool<T>::index;
 			bitset[e.id()] |= bits;
 			callback(e, ecs_event::add);
 		}
@@ -437,7 +440,7 @@ export namespace jolly {
 				pool->del(e);
 			}
 
-			u32 bits = (u32)(1 << pool<T>::index);
+			u64 bits = (u64)1 << pool<T>::index;
 			bitset[e.id()] &= ~bits;
 			callback(e, ecs_event::del);
 		}
@@ -462,26 +465,26 @@ export namespace jolly {
 
 		template<typename T>
 		ref<pool<T>> view() {
-			if (pool<T>::index == U32_MAX)
+			if (pool<T>::index == U64_MAX)
 				register_pool<T>();
-			return pools[pool<T>::index].get<pool<T>>();
+			return pools[(u32)pool<T>::index].get<pool<T>>();
 		}
 
 		template<typename T>
-		ref<pool<T>> view() const {
-			return pools[pool<T>::index].get<pool<T>>();
+		cref<pool<T>> view() const {
+			return pools[(u32)pool<T>::index].get<pool<T>>();
 		}
 
 		template<typename... Ts>
 		ref<jolly::group<Ts...>> group() {
-			if (jolly::group<Ts...>::index == U32_MAX)
+			if (jolly::group<Ts...>::index == U64_MAX)
 				register_group<Ts...>();
-			return groups[jolly::group<Ts...>::index].one.get<jolly::group<Ts...>>();
+			return groups[(u32)jolly::group<Ts...>::index].one.get<jolly::group<Ts...>>();
 		}
 
 		template<typename... Ts>
-		ref<jolly::group<Ts...>> group() const {
-			return groups[jolly::group<Ts...>::index].one.get<jolly::group<Ts...>>();
+		cref<jolly::group<Ts...>> group() const {
+			return groups[(u32)jolly::group<Ts...>::index].one.get<jolly::group<Ts...>>();
 		}
 
 		core::vector<e_id> entities;

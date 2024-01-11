@@ -80,6 +80,14 @@ export namespace core {
 			return (u32)bytes;
 		}
 
+		u32 read(ref<buffer> buf) {
+			return file_base::read(buf);
+		}
+
+		u32 read(ref<vector<u8>> buf) {
+			return file_base::read(buf);
+		}
+
 		u32 read() {
 			return file_base::read(data);
 		}

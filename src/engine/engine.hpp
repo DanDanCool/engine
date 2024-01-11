@@ -11,6 +11,7 @@ import core.atom;
 import core.lock;
 import core.timer;
 import core.memory;
+import core.log;
 
 export namespace jolly {
 	struct engine {
@@ -23,9 +24,6 @@ export namespace jolly {
 		}
 
 		~engine() {
-			for (auto& sys : _systems.vals()) {
-				sys->term();
-			}
 		}
 
 		// obtain a rview/wview
@@ -52,6 +50,10 @@ export namespace jolly {
 				}
 
 				run = _run.get(core::memory_order_relaxed);
+			}
+
+			for (auto& sys : _systems.vals()) {
+				sys->term();
 			}
 		}
 

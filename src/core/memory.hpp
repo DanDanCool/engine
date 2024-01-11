@@ -314,5 +314,4 @@ export namespace core {
 	};
 
 	using buffer = buffer_base<BLOCK_4096>;
-
 }

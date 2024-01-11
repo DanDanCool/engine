@@ -392,20 +392,21 @@ export namespace jolly {
 			auto& gpu = main_gpu();
 
 			core::file fvertex = core::fopen(core::format_string("%.vert.spv", fname), core::access::ro);
-			auto vbuf = fvertex.read();
+			core::vector<u8> vbuf, fbuf;
+			fvertex.read(vbuf);
 
 			VkShaderModuleCreateInfo vinfo{};
 			vinfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			//vinfo.codeSize = vbuf.size;
-			//vinfo.pCode = (u32*)vbuf.data;
+			vinfo.codeSize = vbuf.size;
+			vinfo.pCode = (u32*)vbuf.data;
 
 			auto ffragment = core::fopen(core::format_string("%.frag.spv", fname), core::access::ro);
-			auto fbuf = ffragment.read();
+			ffragment.read(fbuf);
 
 			VkShaderModuleCreateInfo finfo{};
 			finfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			//finfo.codeSize = fbuf.size;
-			//finfo.pCode = (u32*)fbuf.data;
+			finfo.codeSize = fbuf.size;
+			finfo.pCode = (u32*)fbuf.data;
 
 			VkShaderModule vmodule = VK_NULL_HANDLE, fmodule = VK_NULL_HANDLE;
 			vkCreateShaderModule(gpu.device, &vinfo, nullptr, &vmodule);

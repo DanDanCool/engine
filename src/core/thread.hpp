@@ -15,6 +15,7 @@ export namespace core {
 
 		ref<thread> operator=(thread&& other) {
 			handle = forward_data(other.handle);
+			other.handle = nullptr;
 			return *this;
 		}
 

@@ -89,8 +89,7 @@ namespace core {
 	}
 
 	rwlock::~rwlock() {
-		if (!handle) return;
-		free8(handle.data);
+		// SRWLOCK can be safely deleted as long as there are no acquires
 	}
 
 	ref<rwlock> rwlock::operator=(rwlock&& other) {

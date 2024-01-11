@@ -9,6 +9,7 @@ import core.lock;
 import core.log;
 import core.set;
 import core.atom;
+import core.iterator;
 import jolly.ecs;
 
 using namespace core;
@@ -37,7 +38,7 @@ void test_thread() {
 	LOG_INFO("% thread", DIVIDE);
 	ptr<basicstruct> myptr = ptr_create<basicstruct>(1, 2, 3, 4);
 
-	auto coroutine = [](ref<thread>, ptr<void> in) -> int {
+	auto coroutine = [](ref<thread>, ptr<void>&& in) -> int {
 		ptr<int> args = in.cast<int>();
 
 		for (int x : range(args.get())) {
@@ -47,7 +48,8 @@ void test_thread() {
 		return 0;
 	};
 
-	thread mythread = thread(coroutine, ptr_create<int>(5).cast<void>());
+	auto args = ptr_create<int>(5);
+	thread mythread = thread(coroutine, forward_data(args.cast<void>()));
 	LOG_INFO("thread joined");
 }
 
@@ -59,7 +61,7 @@ void test_atomics() {
 		ref<atom<u32>> counter;
 	};
 
-	auto coroutine = [](ref<thread>, ptr<void> in) {
+	auto coroutine = [](ref<thread>, ptr<void>&& in) {
 		ptr<my_data> args = in.cast<my_data>();
 
 		for (int x : range(10000)) {
@@ -117,9 +119,12 @@ void test_table() {
 		mytable[x] = x;
 	}
 
-	i64 sum = 0;
 	for (i32 x : range(128)) {
 		JOLLY_ASSERT(x == mytable[x]);
+	}
+
+	for (i32 x : range(128)) {
+		mytable.del(x);
 	}
 
 	table<string, i32> words;
@@ -132,7 +137,7 @@ void test_table() {
 	words.del("brown");
 	words.del("lazy");
 
-	for (auto& [key, val] : words) {
+	for (auto [key, val] : words) {
 		LOG_INFO("% %", key, val);
 	}
 }
@@ -143,7 +148,7 @@ void test_ptr() {
 	ptr<int> a = ptr_create<int>(4);
 	LOG_INFO("%, %", scope->data, a.get());
 
-	auto mylambda = [](ptr<int> in) {
+	auto mylambda = [](cref<ptr<int>> in) {
 		LOG_INFO("%", in.get());
 	};
 
@@ -231,22 +236,6 @@ struct test_component2 {
 	int size;
 };
 
-
-namespace jolly {
-	template<>
-	struct components<test_component1, test_component2> {
-		components(ref<ecs> state, e_id e)
-		: one(nullptr)
-		, two(nullptr) {
-			one = &state.get<test_component1>(e);
-			two = &state.get<test_component2>(e);
-		}
-
-		test_component1* one;
-		test_component2* two;
-	};
-}
-
 void test_ecs() {
 	LOG_INFO("% ecs", DIVIDE);
 	jolly::ecs ecs;
@@ -265,21 +254,29 @@ void test_ecs() {
 
 	ecs.del<test_component1>(jolly::e_id{0});
 
-	for (auto& [entity, component] : ecs.view<test_component1>()) {
-		LOG_INFO("entity: %, a: % b: % c: %", entity._id, component.a, component.b, component.c);
+	LOG_INFO("ecs.view<test_component1>");
+	for (auto [entity, component] : ecs.view<test_component1>()) {
+		LOG_INFO("entity: %, a: % b: % c: %", entity._id, component->a, component->b, component->c);
 	}
 
-	for (auto& [entity, component] : ecs.view<test_component2>()) {
-		LOG_INFO("entity: %, name: % size: %", entity._id, component.name, component.size);
+	LOG_INFO("ecs.view<test_component2>");
+	for (auto [entity, component] : ecs.view<test_component2>()) {
+		LOG_INFO("entity: %, name: %, size: %", entity._id, component->name, component->size);
 	}
 
-	for (auto& [entity, components] : ecs.group<test_component1, test_component2>()) {
-		LOG_INFO("entity: %, name: %, a: %", entity._id, components.two->name, components.one->a);
+	LOG_INFO("ecs.group");
+	for (auto [entity, components] : ecs.group<test_component1, test_component2>()) {
+		auto [test1, test2] = components;
+		LOG_INFO("entity: %, name: %, a: %", entity._id, test2->name, test1->a);
 	}
 
+	LOG_INFO("ecs.group");
 	ecs.add<test_component2>(jolly::e_id{1}, test_component2{"brown", 44});
-	for (auto& [entity, components] : ecs.group<test_component1, test_component2>()) {
-		LOG_INFO("entity: %, name: %, a: %", entity._id, components.two->name, components.one->a);
+	for (auto [entity, components] : ecs.group<test_component1, test_component2>()) {
+		auto [test1, test2] = components;
+
+		test_component1& t1r = test1;
+		LOG_INFO("entity: %, name: %, a: %", entity._id, test2->name, test1->a);
 	}
 }
 

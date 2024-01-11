@@ -1,6 +1,8 @@
 module;
 
 #include "core.h"
+#include <cstddef>
+#include <tuple>
 
 export module core.tuple;
 import core.memory;
@@ -14,22 +16,25 @@ export namespace core {
 	template <typename T>
 	struct wref {
 		using type = T;
+		wref()
+		: data(nullptr) {}
+
 		wref(type& in)
-		: data(in) {}
+		: data(&in) {}
 
 		operator cref<type>() const {
 			return data;
 		}
 
 		operator ref<type>() {
-			return data;
+			return *data;
 		}
 
 		type* operator->() const {
-			return &data;
+			return data;
 		}
 
-		type& data;
+		type* data;
 	};
 
 	template <typename T1, typename T2>
@@ -182,8 +187,18 @@ export namespace core {
 			*this = forward_data(other);
 		}
 
+		tuple(cref<this_type> other)
+		: data() {
+			*this = other;
+		}
+
 		ref<this_type> operator=(this_type&& other) {
 			_move(forward_data(other), sequence_type{});
+			return *this;
+		}
+
+		ref<this_type> operator=(cref<this_type> other) {
+			_copy(other, sequence_type{});
 			return *this;
 		}
 
@@ -197,12 +212,22 @@ export namespace core {
 			swallow(helper(forward_data(other), *this, uint_constant<Indices>{})...);
 		}
 
-		template<u32 I>
+		template<u32... Indices>
+		void _copy(cref<this_type> other, index_sequence<Indices...>) {
+			auto helper = []<u32 I>(cref<this_type> src, ref<this_type> dst, uint_constant<I>) {
+				dst.get<I>() = forward_data(copy(src.get<I>()));
+				return 0;
+			};
+
+			swallow(helper(other, *this, uint_constant<Indices>{})...);
+		}
+
+		template<std::size_t I>
 		cref<tuple_element_t<I, Ts...>> get() const {
 			return tuple_get<I>(data);
 		}
 
-		template<u32 I>
+		template<std::size_t I>
 		ref<tuple_element_t<I, Ts...>> get() {
 			return tuple_get<I>(data);
 		}
@@ -282,7 +307,7 @@ export namespace core {
 					return 0;
 				};
 
-				swallow(helper(data.get<Indices>()[idx], data.get<Indices>()[last], uint_constant<Indices>{})...);
+				swallow(helper(data.get<Indices>()[last], data.get<Indices>()[idx], uint_constant<Indices>{})...);
 			};
 
 			del_helper(data, idx, --size, sequence_type{});
@@ -343,4 +368,17 @@ export namespace core {
 		u32 reserve;
 		u32 size;
 	};
-};
+}
+
+// implement structured bindings
+export namespace std {
+	template <typename... Ts>
+	struct tuple_size<core::tuple<Ts...>> {
+		static const size_t value = sizeof...(Ts);
+	};
+
+	template <size_t I, typename... Ts>
+	struct tuple_element<I, core::tuple<Ts...>> {
+		using type = core::tuple_element_t<I, Ts...>;
+	};
+}

@@ -51,8 +51,8 @@ export namespace jolly {
 		virtual void step(f32 ms) {
 			auto state = core::rview_create(engine::instance().get_ecs());
 
-			for (auto [entity, component] : core::rview_create(state->view<quad_component>())) {
-				LOG_INFO("quad_component: e", entity.id());
+			for (auto [entity, component] : core::rview_create(state->view<ui_component>())) {
+				LOG_INFO("ui_component: e", entity.id());
 			}
 
 			auto renderui = [](ref<render_graph> graph) {

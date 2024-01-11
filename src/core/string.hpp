@@ -100,7 +100,7 @@ export namespace core {
 			u32 bytes = (u32)((size + 1) * sizeof(type));
 			memptr ptr = alloc256(bytes);
 			copy256((u8*)data, ptr.data, align_size256(bytes));
-			return forward_data(this_type((type*)data, size));
+			return this_type((type*)ptr.data, size);
 		}
 
 		struct iterator_base {

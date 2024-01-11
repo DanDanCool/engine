@@ -33,14 +33,16 @@ namespace core {
 		return bytes;
 	}
 
+	// if buf already has memory allocated this will cause a memory leak
 	u32 file_base::read(ref<vector<u8>> buf) {
 		int fd = get_fd(handle);
 
 		i32 bytes = (i32)_lseek(fd, 0, SEEK_END);
-		JOLLY_ASSERT(bytes >= 0, "file seek failed!");
-		buf.resize(bytes);
+		JOLLY_ASSERT(bytes > 0, "file seek failed!");
+		buf = forward_data(vector<u8>(bytes));
+		buf.size = bytes;
 		bytes = (i32)_lseek(fd, 0, SEEK_SET);
-		JOLLY_ASSERT(bytes >= 0, "file seek failed!");
+		JOLLY_ASSERT(bytes == 0, "file seek failed!");
 		bytes = _read(fd, buf.data, buf.size);
 
 		return bytes;
