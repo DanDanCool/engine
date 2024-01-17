@@ -1,8 +1,5 @@
-module;
-
-#include <core/core.h>
-
 export module jolly.system;
+import core.types;
 import core.thread;
 import core.memory;
 
@@ -21,14 +18,14 @@ export namespace jolly {
 		virtual ~system_thread() = default;
 
 		virtual void init() {
-			auto start = [](ref<core::thread> _, core::ptr<void>&& args) {
+			auto start = [](ref<core::thread> _, core::mem<void>&& args) {
 				auto sys = args.cast<system_thread>();
 				sys->run();
 				sys = nullptr;
 				return 0;
 			};
 
-			thread = core::thread((core::pfn_thread)start, core::ptr<void>((void*)this));
+			thread = core::thread((core::pfn_thread)start, core::mem<void>((void*)this));
 		}
 
 		virtual void term() {

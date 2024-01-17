@@ -3,6 +3,7 @@ module;
 #include <core/core.h>
 
 export module jolly.render_thread;
+import core.types;
 import core.atom;
 import core.memory;
 import core.timer;
@@ -34,7 +35,7 @@ export namespace jolly {
 		}
 
 		virtual void run() {
-			_device = core::ptr_create<vk_device>("jolly");
+			_device = core::mem_create<vk_device>("jolly");
 
 			f32 dt = 0;
 			bool run = _run.get(core::memory_order_relaxed);
@@ -53,7 +54,7 @@ export namespace jolly {
 			return _graph;
 		}
 
-		core::ptr<vk_device> _device;
+		core::mem<vk_device> _device;
 		render_graph _graph;
 		core::atom<bool> _run;
 	};

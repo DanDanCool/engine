@@ -1,8 +1,9 @@
 module;
 
-#include <core/core.h>
+#include "core.h"
 
 export module core.view;
+import core.types;
 
 namespace core {
 export namespace view {

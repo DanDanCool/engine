@@ -1,6 +1,7 @@
 #include <core/core.h>
 
 import core.memory;
+import core.types;
 import jolly.engine;
 import jolly.render_thread;
 import jolly.ui_system;
@@ -10,8 +11,8 @@ int main() {
 
 	{
 		auto wview = core::wview_create(engine);
-		wview->add("render", core::ptr_create<jolly::render_thread>().cast<jolly::system>());
-		wview->add("ui", core::ptr_create<jolly::ui_system>().cast<jolly::system>());
+		wview->add("render", core::mem_create<jolly::render_thread>().cast<jolly::system>());
+		wview->add("ui", core::mem_create<jolly::ui_system>().cast<jolly::system>());
 	}
 
 	engine.run();

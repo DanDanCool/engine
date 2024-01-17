@@ -3,6 +3,7 @@ module;
 #include <core/core.h>
 
 export module jolly.render_graph;
+import core.types;
 import render.primitives;
 import core.table;
 import core.vector;

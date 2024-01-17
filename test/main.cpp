@@ -1,5 +1,6 @@
 #include <core/core.h>
 
+import core.types;
 import core.vector;
 import core.memory;
 import core.string;
@@ -36,10 +37,10 @@ void test_assert() {
 
 void test_thread() {
 	LOG_INFO("% thread", DIVIDE);
-	ptr<basicstruct> myptr = ptr_create<basicstruct>(1, 2, 3, 4);
+	mem<basicstruct> myptr = mem_create<basicstruct>(1, 2, 3, 4);
 
-	auto coroutine = [](ref<thread>, ptr<void>&& in) -> int {
-		ptr<int> args = in.cast<int>();
+	auto coroutine = [](ref<thread>, mem<void>&& in) -> int {
+		mem<int> args = in.cast<int>();
 
 		for (int x : range(args.get())) {
 			LOG_INFO("%", x);
@@ -48,7 +49,7 @@ void test_thread() {
 		return 0;
 	};
 
-	auto args = ptr_create<int>(5);
+	auto args = mem_create<int>(5);
 	thread mythread = thread(coroutine, forward_data(args.cast<void>()));
 	LOG_INFO("thread joined");
 }
@@ -61,8 +62,8 @@ void test_atomics() {
 		ref<atom<u32>> counter;
 	};
 
-	auto coroutine = [](ref<thread>, ptr<void>&& in) {
-		ptr<my_data> args = in.cast<my_data>();
+	auto coroutine = [](ref<thread>, mem<void>&& in) {
+		mem<my_data> args = in.cast<my_data>();
 
 		for (int x : range(10000)) {
 			u32 val = args->counter.get(memory_order_relaxed);
@@ -74,7 +75,7 @@ void test_atomics() {
 
 	vector<thread> threads(10);
 	for (int i : range(10)) {
-		threads[i] = thread(coroutine, ptr_create<my_data>(counter).cast<void>());
+		threads[i] = thread(coroutine, mem_create<my_data>(counter).cast<void>());
 	}
 
 	for (int i : range(10)) {
@@ -144,24 +145,24 @@ void test_table() {
 
 void test_ptr() {
 	LOG_INFO("% ptr", DIVIDE);
-	ptr<string> scope = ptr_create<string>("hello world");
-	ptr<int> a = ptr_create<int>(4);
+	mem<string> scope = mem_create<string>("hello world");
+	mem<int> a = mem_create<int>(4);
 	LOG_INFO("%, %", scope->data, a.get());
 
-	auto mylambda = [](cref<ptr<int>> in) {
+	auto mylambda = [](cref<mem<int>> in) {
 		LOG_INFO("%", in.get());
 	};
 
-	ptr<int> foo = ptr_create<int>(69);
+	mem<int> foo = mem_create<int>(69);
 	mylambda(foo);
 
-	vector<ptr<int>> indirect(0);
+	vector<mem<int>> indirect(0);
 
 	for (int i : range(10)) {
-		indirect.add(ptr_create<int>(i));
+		indirect.add(mem_create<int>(i));
 	}
 
-	for (cref<ptr<int>> p : reverse(indirect)) {
+	for (cref<mem<int>> p : reverse(indirect)) {
 		LOG_INFO("%", p.get());
 	}
 }
@@ -280,6 +281,29 @@ void test_ecs() {
 	}
 }
 
+void test_convert() {
+	LOG_INFO("% string conversion", DIVIDE);
+	i64 i = stoi("543");
+	i64 i_neg = stoi("-543");
+	i64 i_score = stoi("876_999");
+
+	LOG_INFO("test int % test int", i);
+	LOG_INFO("test int % test int", i_neg);
+	LOG_INFO("test int % test int", i_score);
+
+	f64 f = stod("5.0");
+	f64 f_dot = stod("5.");
+	f64 f_neg = stod("-8432.234");
+	f64 f_exp = stod("3344.3e10");
+	f64 f_nexp = stod("-3.45321e-66");
+
+	LOG_INFO("test float % test float", f);
+	LOG_INFO("test float % test float", f_dot);
+	LOG_INFO("test float % test float", f_neg);
+	LOG_INFO("test float % test float", f_exp);
+	LOG_INFO("test float % test float", f_nexp);
+}
+
 int main() {
 	test_assert();
 	test_thread();
@@ -293,4 +317,5 @@ int main() {
 	test_mutex();
 
 	test_ecs();
+	test_convert();
 }

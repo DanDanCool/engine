@@ -3,6 +3,7 @@ module;
 #include "core.h"
 
 export module core.file;
+import core.types;
 import core.string;
 import core.memory;
 import core.vector;
@@ -34,7 +35,7 @@ export namespace core {
 			return *this;
 		}
 
-		virtual u32 write(memptr buf);
+		virtual u32 write(membuf buf);
 		virtual u32 read(ref<buffer> buf);
 		virtual u32 read(ref<vector<u8>> buf); // read everything
 
@@ -63,13 +64,13 @@ export namespace core {
 			return *this;
 		}
 
-		virtual u32 write(memptr buf) {
+		virtual u32 write(membuf buf) {
 			u64 bytes = buf.size;
 			buf = data.write(buf);
 			bytes -= buf.size;
 
 			while (buf.size) {
-				u32 tmp = file::write(memptr{ data.data, data.index });
+				u32 tmp = file::write(membuf{ data.data, data.index });
 				if (!tmp) return (u32)bytes;
 				bytes += tmp;
 

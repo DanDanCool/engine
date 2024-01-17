@@ -7,6 +7,7 @@ module;
 
 module win32.window;
 import core.view;
+import core.iterator;
 import vulkan.device;
 import vulkan.surface;
 
@@ -94,7 +95,7 @@ namespace jolly {
 				NULL, NULL, (HINSTANCE)handle.data(), NULL
 				);
 
-		core::ptr<u32> data = core::ptr_create<u32>(id);
+		core::mem<u32> data = core::mem_create<u32>(id);
 		SetPropW(win, L"id", (HANDLE)data.data);
 		data = nullptr;
 		SetPropW(win, L"state", (HANDLE)this);
@@ -121,7 +122,7 @@ namespace jolly {
 	}
 
 	void window::vk_init(cref<vk_device> device) {
-		surface = core::ptr_create<vk_surface>(device);
+		surface = core::mem_create<vk_surface>(device);
 
 		auto create_cb = [](ref<window> state, u32 id, win_event event) {
 			ref<vk_surface> surface = state.surface.get();
@@ -459,7 +460,7 @@ namespace jolly {
 		core::handle hwnd = state.windows[id];
 
 		RemovePropW((HWND)hwnd.data(), L"state");
-		core::ptr<void> data = RemovePropW((HWND)hwnd.data(), L"id");
+		core::mem<void> data = RemovePropW((HWND)hwnd.data(), L"id");
 
 		state.windows.del(id);
 

@@ -1,8 +1,5 @@
-module;
-
-#include "core.h"
-
 export module core.traits;
+import core.types;
 
 export namespace core {
 	template <typename T, T val>
@@ -91,8 +88,4 @@ export namespace core {
 	void destroy(T* data) {
 		_destroy<is_destructible_v<T>>::destroy<T>(data);
 	};
-
-	// hack to use pack expansion
-	template <typename... Ts>
-	void swallow(Ts&&...) {}
 }

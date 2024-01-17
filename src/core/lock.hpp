@@ -1,8 +1,5 @@
-module;
-
-#include "core.h"
-
 export module core.lock;
+import core.types;
 import core.memory;
 import core.atom;
 
@@ -111,7 +108,7 @@ export namespace core {
 			return write_lock(*this);
 		}
 
-		core::ptr<void> handle;
+		core::mem<void> handle;
 	};
 
 	template <typename T, typename Impl>

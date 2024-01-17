@@ -1,7 +1,3 @@
-module;
-
-#include <core/core.h>
-
 export module jolly.components;
 import math.vec;
 

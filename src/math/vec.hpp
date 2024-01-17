@@ -1,8 +1,5 @@
-module;
-
-#include <core/core.h>
-
 export module math.vec;
+import core.types;
 
 export namespace math {
 	template <typename T>

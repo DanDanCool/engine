@@ -1,8 +1,5 @@
-module;
-
-#include "core.h"
-
 export module core.timer;
+import core.types;
 
 export namespace core {
 	struct timer {

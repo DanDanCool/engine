@@ -1,8 +1,5 @@
-module;
-
-#include "core.h"
-
 export module core.atom;
+import core.types;
 
 #define ATOM_DEFINE_GET(order) \
 type get(order) const { \

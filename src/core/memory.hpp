@@ -11,21 +11,22 @@ module;
 #include <new>
 
 export module core.memory;
+import core.types;
 import core.simd;
 import core.traits;
-import core.operations;
+import core.iterator;
 
 export namespace core {
-	struct memptr {
+	struct membuf {
 		u8* data;
 		u64 size;
 	};
 
-	memptr alloc256_dbg_win32_(u32 size, const char* fn, int ln);
-	memptr alloc8_dbg_win32_(u32 size, const char* fn, int ln);
+	membuf alloc256_dbg_win32_(u32 size, const char* fn, int ln);
+	membuf alloc8_dbg_win32_(u32 size, const char* fn, int ln);
 
-	memptr alloc256(u32 size) {
-		memptr ptr = {0};
+	membuf alloc256(u32 size) {
+		membuf ptr = {0};
 		size = align_size256(size);
 
 #ifdef JOLLY_WIN32
@@ -46,8 +47,8 @@ export namespace core {
 #endif
 	}
 
-	memptr alloc8(u32 size) {
-		memptr ptr = {0};
+	membuf alloc8(u32 size) {
+		membuf ptr = {0};
 		ptr.size = size;
 		ptr.data = (u8*)malloc(size);
 		zero8(ptr.data, (u32)ptr.size);
@@ -58,21 +59,21 @@ export namespace core {
 		free(ptr);
 	}
 
-	template <typename T> struct ptr;
+	template <typename T> struct mem;
 
 	template <typename T>
-	struct ptr_base {
+	struct mem_base {
 		using type = T;
-		using this_type = ptr_base<T>;
+		using this_type = mem_base<T>;
 
-		ptr_base() = default;
+		mem_base() = default;
 
-		ptr_base(this_type&& other)
+		mem_base(this_type&& other)
 		: data(nullptr) {
 			*this = forward_data(other);
 		}
 
-		ptr_base(type* in)
+		mem_base(type* in)
 		: data(in) {}
 
 		ref<this_type> operator=(this_type&& other) {
@@ -86,7 +87,7 @@ export namespace core {
 			return *this;
 		}
 
-		~ptr_base() {
+		~mem_base() {
 			if (!data) return;
 			destroy();
 		}
@@ -102,8 +103,8 @@ export namespace core {
 		}
 
 		template <typename S>
-		ptr<S> cast() {
-			ptr<S> p((S*)data);
+		mem<S> cast() {
+			mem<S> p((S*)data);
 			data = nullptr;
 			return forward_data(p);
 		}
@@ -112,9 +113,9 @@ export namespace core {
 	};
 
 	template <typename T>
-	struct ptr : public ptr_base<T> {
+	struct mem : public mem_base<T> {
 		using type = T;
-		using parent_type = ptr_base<T>;
+		using parent_type = mem_base<T>;
 		using parent_type::parent_type;
 
 		ref<type> get() const {
@@ -131,18 +132,18 @@ export namespace core {
 	};
 
 	template<>
-	struct ptr<void> : public ptr_base<void> {
-		using parent_type = ptr_base<void>;
+	struct mem<void> : public mem_base<void> {
+		using parent_type = mem_base<void>;
 		using parent_type::parent_type;
 
 		template<typename S>
 		cref<S> get() const {
-			return *(S*)ptr_base::data;
+			return *(S*)parent_type::data;
 		}
 
 		template<typename S>
 		ref<S> get() {
-			return *(S*)ptr_base::data;
+			return *(S*)parent_type::data;
 		}
 	};
 
@@ -179,7 +180,7 @@ export namespace core {
 			return _data.get();
 		}
 
-		void* data() const {
+		ptr<void> data() const {
 			return _data.data;
 		}
 
@@ -187,18 +188,18 @@ export namespace core {
 			return data();
 		}
 
-		ptr<void> _data;
+		mem<void> _data;
 	};
 
 	template<typename T, typename... Args>
-	ptr<T> ptr_create(Args&&... args) {
+	mem<T> mem_create(Args&&... args) {
 		T* data = (T*)alloc8(sizeof(T)).data;
 		data = new (data) T(forward_data(args)...);
-		return forward_data(ptr<T>(data));
+		return mem<T>(data);
 	}
 
 	struct any {
-		typedef void (*pfn_deleter)(cref<ptr<void>> data);
+		typedef void (*pfn_deleter)(cref<mem<void>> data);
 		any() = default;
 
 		template<typename T>
@@ -208,7 +209,7 @@ export namespace core {
 		}
 
 		template<typename T>
-		any(ptr<T>&& in)
+		any(mem<T>&& in)
 		: data(nullptr), deleter(nullptr) {
 			*this = forward_data(in);
 		}
@@ -225,7 +226,7 @@ export namespace core {
 		}
 
 		template<typename T>
-		ref<any> operator=(ptr<T>&& in) {
+		ref<any> operator=(mem<T>&& in) {
 			*this = in.data;
 			in.data = nullptr;
 			return *this;
@@ -242,11 +243,11 @@ export namespace core {
 		}
 
 		template<typename T>
-		static void destroy(cref<ptr<void>> data) {
-			core::destroy((T*)data.data);
+		static void destroy(cref<mem<void>> data) {
+			core::destroy((ptr<T>)data.data);
 		}
 
-		ptr<void> data;
+		mem<void> data;
 		pfn_deleter deleter;
 	};
 
@@ -285,15 +286,25 @@ export namespace core {
 			return 1;
 		}
 
-		memptr write(memptr buf) {
+		u32 write(u8 character, u32 count) {
+			for (i32 i : range(count)) {
+				if (index >= size) return i;
+				u32 idx = (u32)index++;
+				data[idx] = character;
+			}
+
+			return count;
+		}
+
+		membuf write(membuf buf) {
 			u64 bytes = min(buf.size, size - index);
 			copy8(buf.data, data + index, (u32)bytes);
 
 			index += bytes;
-			return memptr{ buf.data + bytes, buf.size - bytes };
+			return membuf{ buf.data + bytes, buf.size - bytes };
 		}
 
-		memptr read(memptr buf) {
+		membuf read(membuf buf) {
 			u64 bytes = min(buf.size, index);
 			copy8(data, buf.data, bytes);
 
@@ -301,7 +312,7 @@ export namespace core {
 			copy8(data + bytes, data, index);
 			zero8(data + index, bytes);
 
-			return memptr{ buf.data + bytes, buf.size - bytes };
+			return membuf{ buf.data + bytes, buf.size - bytes };
 		}
 
 		void flush() {
@@ -309,7 +320,12 @@ export namespace core {
 			index = 0;
 		}
 
-		ptr<u8> data;
+		ref<u8> operator[](u64 idx) {
+			JOLLY_CORE_ASSERT(idx < size);
+			return data[(u32)idx];
+		}
+
+		mem<u8> data;
 		u64 index;
 	};
 

@@ -3,6 +3,7 @@ module;
 #include <core/core.h>
 
 export module jolly.engine;
+import core.types;
 import jolly.system;
 import jolly.ecs;
 import core.table;
@@ -27,7 +28,7 @@ export namespace jolly {
 		}
 
 		// obtain a rview/wview
-		void add(cref<core::string> name, core::ptr<system>&& sys) {
+		void add(cref<core::string> name, core::mem<system>&& sys) {
 			auto& s = sys.get();
 			_systems[name] = forward_data(sys);
 			s.init();
@@ -70,18 +71,16 @@ export namespace jolly {
 		}
 
 		static ref<engine> instance() {
-			if (!_instance) {
-				_instance = core::ptr_create<engine>();
-			}
-
+			if (!_instance)
+				_instance = core::mem_create<engine>();
 			return *_instance;
 		}
 
-		core::table<core::string, core::ptr<system>> _systems;
+		core::table<core::string, core::mem<system>> _systems;
 		ecs _ecs;
 		core::rwlock _busy;
 		core::atom<bool> _run;
 
-		static inline core::ptr<engine> _instance = nullptr;
+		static inline core::mem<engine> _instance = nullptr;
 	};
 }

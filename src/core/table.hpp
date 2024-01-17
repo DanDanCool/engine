@@ -3,6 +3,8 @@ module;
 #include "core.h"
 
 export module core.table;
+import core.simd;
+import core.types;
 import core.tuple;
 import core.vector;
 import core.tuple;
@@ -97,8 +99,13 @@ export namespace core {
 			return probe;
 		}
 
+		u32 _hash(cref<key_type> key) const {
+			u32 res = core::hash(key);
+			return res | (res == 0);
+		}
+
 		u32 _find(cref<key_type> key) const {
-			u32 h = hash(key);
+			u32 h = _hash(key);
 			for (i32 i : range(TABLE_PROBE)) {
 				u32 idx = (h + i) % reserve;
 				u32 tmp = _keys.get<HASH_INDEX>(idx);
@@ -123,7 +130,7 @@ export namespace core {
 
 			u32 dense = _vals.size;
 			_vals.add(forward_data(val), 0);
-			u32 p = _probe(key, hash(key), dense);
+			u32 p = _probe(key, _hash(key), dense);
 			size++;
 
 			if (p >= TABLE_PROBE) {

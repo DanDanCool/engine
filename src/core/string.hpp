@@ -3,10 +3,12 @@ module;
 #include "core.h"
 
 export module core.string;
+import core.types;
 import core.memory;
 import core.simd;
-import core.operations;
 import core.iterator;
+import core.operations;
+import core.tuple;
 
 export namespace core {
 	template<typename T>
@@ -59,7 +61,7 @@ export namespace core {
 			}
 
 			u32 bytes = (u32)((count + 1) * sizeof(type));
-			memptr ptr = alloc256(bytes);
+			auto ptr = alloc256(bytes);
 			copy8((u8*)str, ptr.data, bytes);
 
 			data = (type*)ptr.data;
@@ -70,7 +72,7 @@ export namespace core {
 		template <typename S>
 		string_base<S> cast() const {
 			u32 bytes = (u32)((size + 1) * sizeof(S));
-			memptr ptr = alloc256(bytes);
+			auto ptr = alloc256(bytes);
 			S* buf = (S*)ptr.data;
 			for (int i : range(bytes)) {
 				buf[i] = (S)data[i];
@@ -79,8 +81,8 @@ export namespace core {
 			return string_base<S>(buf, bytes);
 		}
 
-		cref<type> operator[](u32 idx) const {
-			return cref(data[idx]);
+		type operator[](u32 idx) const {
+			return data[idx];
 		}
 
 		bool operator==(cref<this_type> other) const {
@@ -92,13 +94,13 @@ export namespace core {
 			return data;
 		}
 
-		operator memptr() const {
-			return memptr{ (u8*)data, size * sizeof(type) };
+		operator membuf() const {
+			return membuf{ (u8*)data, size * sizeof(type) };
 		}
 
 		this_type copy() const {
 			u32 bytes = (u32)((size + 1) * sizeof(type));
-			memptr ptr = alloc256(bytes);
+			auto ptr = alloc256(bytes);
 			copy256((u8*)data, ptr.data, align_size256(bytes));
 			return this_type((type*)ptr.data, size);
 		}
@@ -183,4 +185,121 @@ export namespace core {
 
 	typedef string_base<i8> string;
 	typedef string_view_base<i8> string_view;
+
+	i64 stoi_impl(cstr in, i64 base, auto transform, i32 end = BLOCK_64) {
+		// maximum length of a number that can be encoded by i64 is 19 characters
+		array<i8, 20> data;
+		for (i32 i : range( end)) {
+			if (!in[i]) break;
+			if (in[i] == '_') continue;
+
+			data.add(transform(in[i]));
+			if (data.index >= 20) break;
+		}
+
+		i64 num = 0;
+		i64 mul = 1;
+		for (i64 digit : reverse(data)) {
+			num += digit * mul;
+			mul *= base;
+		}
+
+		return num;
+	}
+
+	i64 stoi(cstr in) {
+		i64 sign = in[0] == '-' ? -1 : 1;
+		i64 beg = 0 + (in[0] == '-') + (in[0] == '+');
+
+		auto transform = [](i8 in) {
+			i8 tmp = in - '0';
+			JOLLY_CORE_ASSERT(tmp < 10);
+			return tmp;
+		};
+
+		return stoi_impl(in + beg, 10, transform) * sign;
+	}
+
+	i64 stoh(cstr in) {
+		auto transform = [](i8 in) {
+			i8 digit = in - '0';
+			i8 upper = in - 'A';
+			i8 lower = in - 'a';
+
+			digit = digit < 0 ? I8_MAX : digit;
+			upper = digit < 0 ? I8_MAX : upper + 10;
+			lower = digit < 0 ? I8_MAX : lower + 10;
+
+			i8 tmp = min(digit, min(upper, lower));
+			JOLLY_CORE_ASSERT(tmp <= 0xf);
+			return tmp;
+		};
+
+		i64 sign = in[0] == '-' ? -1 : 1;
+		i64 beg = 0 + (in[0] == '-') + (in[0] == '+');
+
+		JOLLY_CORE_ASSERT(in[beg] == '0');
+		JOLLY_CORE_ASSERT(in[beg + 1] == 'x');
+
+		return stoi_impl(in + beg + 2, 16, transform) * sign;
+	}
+
+	f64 stod(cstr in) {
+		auto transform = [](i8 in) {
+			i8 tmp = in - '0';
+			JOLLY_CORE_ASSERT(tmp < 10);
+			return tmp;
+		};
+
+		i32 deci = -1;
+		i32 expo = -1;
+		i32 size = -1;
+
+		for (i32 i : range(BLOCK_64)) {
+			if (!in[i]) {
+				size = i;
+				break;
+			}
+			if (in[i] == '.')
+				deci = i;
+			if (in[i] == 'e')
+				expo = i;
+		}
+
+		i64 sign = in[0] == '-' ? -1 : 1;
+		f64 whole = 0, fract = 0, power = 1;
+
+		i64 beg = (in[0] == '-') + (in[0] == '+');
+		i64 end = (deci == -1 ? size : deci) - beg;
+		whole = (f64)stoi_impl(in + beg, 10, transform, end);
+
+		if (deci != -1) {
+			i64 offset = deci + 1;
+			i64 end = (expo == -1 ? size : expo) - offset;
+			fract = (f64)stoi_impl(in + offset, 10, transform, end);
+
+			f64 div = 1;
+			for (i32 i : range(end)) {
+				div *= 10;
+			}
+
+			fract /= div;
+		}
+
+		if (expo != -1) {
+			i64 sign = in[expo + 1] == '-' ? -1 : 1;
+			i64 beg = 1 + (in[expo + 1] == '-') + (in[expo + 1] == '+');
+			i64 count = stoi_impl(in + beg + expo, 10, transform);
+
+			for (i32 i : range((i32)count)) {
+				power *= 10;
+			}
+
+			if (sign == -1) {
+				power = 1 / power;
+			}
+		}
+
+		return (whole + fract) * power * sign;
+	}
 };

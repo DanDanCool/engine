@@ -1,8 +1,5 @@
-module;
-
-#include <core/core.h>
-
 export module jolly.ui;
+import core.types;
 import core.string;
 import math.vec;
 

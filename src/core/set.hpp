@@ -4,6 +4,7 @@ module;
 #include "core.h"
 
 export module core.set;
+import core.types;
 import core.iterator;
 import core.table;
 import core.vector;

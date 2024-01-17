@@ -1,6 +1,7 @@
 #include "core.h"
 
 import core.log;
+import core.types;
 
 namespace assert {
 	cstr message(cstr msg) {
@@ -11,5 +12,3 @@ namespace assert {
 		LOG_CRIT("% failed! in file: %, line: %\n%", expr, file, line, message);
 	}
 }
-
-

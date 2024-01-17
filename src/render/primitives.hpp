@@ -3,6 +3,7 @@ module;
 #include <core/core.h>
 
 export module render.primitives;
+import core.types;
 import math.vec;
 import core.memory;
 import core.tuple;

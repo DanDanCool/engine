@@ -4,6 +4,7 @@ module;
 #include <vulkan/vulkan.h>
 
 export module vulkan.surface;
+import core.types;
 import core.table;
 import core.vector;
 import core.lock;

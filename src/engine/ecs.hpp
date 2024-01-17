@@ -3,6 +3,7 @@ module;
 #include <core/core.h>
 
 export module jolly.ecs;
+import core.types;
 import core.vector;
 import core.simd;
 import core.tuple;
@@ -236,29 +237,6 @@ export namespace jolly {
 			return busy;
 		}
 
-		template <typename Impl>
-		struct view_impl: public Impl {
-			static void acquire(cref<core::rwlock> l, ref<this_type> in) {
-				auto helper = [](cref<core::rwlock> l, ref<this_type> in) {
-					Impl::acquire(l, in);
-					return 0;
-				};
-
-				Impl::acquire(l, in);
-				core::swallow(helper(get_view_lock(in.state), in)...);
-			}
-
-			static void release(cref<core::rwlock> l, ref<this_type> in) {
-				auto helper = [](cref<core::rwlock> l, ref<this_type> in) {
-					Impl::release(l, in);
-					return 0;
-				};
-
-				Impl::release(l, in);
-				core::swallow(helper(get_view_lock(in.state), in)...);
-			}
-		};
-
 		struct iterator: public impl_ecs::iterator<this_type> {
 			using parent_type = impl_ecs::iterator<this_type>;
 			using pair_type = core::pair<e_id, tuple_type>;
@@ -370,7 +348,7 @@ export namespace jolly {
 			JOLLY_ASSERT(pools.size < MAX_POOLS, "max pool size reached");
 			pool<T>::index = pools.size;
 			auto& p = pools.add();
-			p = core::ptr_create<pool<T>>();
+			p = core::mem_create<pool<T>>();
 
 			auto destroy_cb = [](ref<ecs> state, e_id e, ecs_event event) {
 				auto& pool = state.view<T>();
@@ -384,7 +362,7 @@ export namespace jolly {
 		void register_group() {
 			jolly::group<Ts...>::index = groups.size;
 			auto& group_info = groups.add();
-			group_info.one = core::ptr_create<jolly::group<Ts...>>(*this);
+			group_info.one = core::mem_create<jolly::group<Ts...>>(*this);
 			group_info.two = jolly::group<Ts...>::bitset();
 			auto& g = group_info.one.get<jolly::group<Ts...>>();
 
@@ -397,8 +375,8 @@ export namespace jolly {
 			auto entity_add_cb = [](ref<ecs> state, e_id e, ecs_event event) {
 				u64 bits = state.groups[(u32)jolly::group<Ts...>::index].two;
 				if ((state.bitset[e.id()] & bits) == bits) {
-					auto& g = state.group<Ts...>();
-					g.add(e);
+					auto g = core::wview_create(state.group<Ts...>());
+					g->add(e);
 				}
 			};
 
@@ -406,8 +384,8 @@ export namespace jolly {
 				auto& g = state.group<Ts...>();
 				u64 bits = state.groups[(u32)jolly::group<Ts...>::index].two;
 				if (g.has(e) && (state.bitset[e.id()] & bits) != bits) {
-					auto& g = state.group<Ts...>();
-					g.del(e);
+					auto g = core::wview_create(state.group<Ts...>());
+					g->del(e);
 				}
 			};
 
@@ -459,7 +437,7 @@ export namespace jolly {
 
 		template<typename T>
 		bool has(e_id e) const {
-			auto& pool = core::rview_create(view<T>());
+			auto pool = core::rview_create(view<T>());
 			return pool->has(e);
 		}
 
@@ -504,14 +482,40 @@ export namespace jolly {
 	}
 }
 
+namespace jolly {
+	template <typename Impl, typename... Ts>
+	struct group_view_impl: public Impl {
+		using this_type = group<Ts...>;
+		static void acquire(cref<core::rwlock> l, ref<this_type> in) {
+			auto helper = [](cref<core::rwlock> l, ref<this_type> in) {
+				Impl::acquire(l, in);
+				return 0;
+			};
+
+			Impl::acquire(l, in);
+			(helper(get_view_lock<Ts>(in.state), in), ...);
+		}
+
+		static void release(cref<core::rwlock> l, ref<this_type> in) {
+			auto helper = [](cref<core::rwlock> l, ref<this_type> in) {
+				Impl::release(l, in);
+				return 0;
+			};
+
+			Impl::release(l, in);
+			(helper(get_view_lock<Ts>(in.state), in), ...);
+		}
+	};
+}
+
 template <typename... Ts>
 using group_t = jolly::group<Ts...>;
 
 template <typename... Ts>
-using rview_impl_t = group_t<Ts...>::view_impl<core::rview_impl<group_t<Ts...>>>;
+using rview_impl_t = jolly::group_view_impl<core::rview_impl<group_t<Ts...>>, Ts...>;
 
 template <typename... Ts>
-using wview_impl_t = group_t<Ts...>::view_impl<core::wview_impl<group_t<Ts...>>>;
+using wview_impl_t = jolly::group_view_impl<core::wview_impl<group_t<Ts...>>, Ts...>;
 
 export namespace core {
 	template<typename... Ts>

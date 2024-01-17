@@ -27,7 +27,7 @@ namespace core {
 		_close(fd);
 	}
 
-	u32 file_base::write(memptr buf) {
+	u32 file_base::write(membuf buf) {
 		int fd = get_fd(handle);
 		int bytes = _write(fd, buf.data, (u32)buf.size);
 		return bytes;

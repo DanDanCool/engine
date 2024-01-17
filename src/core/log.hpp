@@ -4,13 +4,16 @@ module;
 #include <cstdio>
 
 export module core.log;
+import core.types;
 import core.string;
 import core.tuple;
 import core.memory;
+import core.simd;
 import core.iterator;
 import core.file;
 import core.lock;
 import core.traits;
+import core.impl.schubfach;
 
 #define FORMAT_INT(type) \
 void format(type arg, ref<fmtbuf> buf) { format((i64)arg, buf); }
@@ -56,10 +59,9 @@ export namespace core {
 			buf.write((u8)'-');
 		}
 
-		for (int i : range(data.index, 0, -1)) {
-			i--;
+		for (i8 digit : reverse(data)) {
 			if (buf.index >= fmtbuf::size) return;
-			buf.write((u8)data[i]);
+			buf.write((u8)digit);
 		}
 	}
 
@@ -69,6 +71,14 @@ export namespace core {
 		} else {
 			format("false", buf);
 		}
+	}
+
+	void format(f64 arg, ref<fmtbuf> buf) {
+		core::impl::schubfach64(arg, buf);
+	}
+
+	void format(f32 arg, ref<fmtbuf> buf) {
+		core::impl::schubfach64((f64)arg, buf);
 	}
 
 	FORMAT_INT(i16);
@@ -115,7 +125,7 @@ export namespace core {
 		sink() = default;
 		virtual ~sink() = default;
 
-		virtual void write(memptr buf) = 0;
+		virtual void write(membuf buf) = 0;
 		virtual void flush() = 0;
 	};
 
@@ -125,7 +135,7 @@ export namespace core {
 			flush();
 		}
 
-		virtual void write(memptr buf) {
+		virtual void write(membuf buf) {
 			lock l(_lock);
 			fwrite(buf.data, sizeof(u8), buf.size, stdout);
 		}
@@ -145,7 +155,7 @@ export namespace core {
 		logger()
 		: _sink() {
 			JOLLY_CORE_ASSERT(_instance == nullptr);
-			_sink = ptr_create<stdout_sink>().cast<sink>();
+			_sink = mem_create<stdout_sink>().cast<sink>();
 		}
 
 		~logger() {
@@ -156,17 +166,17 @@ export namespace core {
 			switch (level) {
 				case severity::info: {
 					const char data[] = "info: ";
-					_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+					_sink->write(membuf{ (u8*)data, sizeof(data) - 1 });
 					break;
 									 }
 				case severity::warn: {
 					const char data[] = "warn: ";
-					_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+					_sink->write(membuf{ (u8*)data, sizeof(data) - 1 });
 					break;
 									 }
 				case severity::crit: {
 					const char data[] = "crit: ";
-					_sink->write(memptr{ (u8*)data, sizeof(data) - 1 });
+					_sink->write(membuf{ (u8*)data, sizeof(data) - 1 });
 					break;
 				 }
 			}
@@ -174,7 +184,7 @@ export namespace core {
 			_sink->write(log);
 
 			cstr newline = "\n";
-			_sink->write(memptr{ (u8*)newline, 1 });
+			_sink->write(membuf{ (u8*)newline, 1 });
 			_sink->flush();
 		}
 
@@ -193,14 +203,14 @@ export namespace core {
 
 		static ref<logger> instance() {
 			if (!_instance) {
-				_instance = ptr_create<logger>();
+				_instance = mem_create<logger>();
 			}
 
 			return *_instance;
 		}
 
-		ptr<sink> _sink;
+		mem<sink> _sink;
 
-		static inline ptr<logger> _instance = nullptr;
+		static inline mem<logger> _instance = nullptr;
 	};
 }

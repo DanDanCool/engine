@@ -3,6 +3,7 @@ module;
 #include "core.h"
 
 export module core.operations;
+import core.types;
 import core.iterator;
 
 export namespace core {
@@ -12,24 +13,13 @@ export namespace core {
 		for (i32 i : range(size))
 			hash = (hash ^ key[i]) * 0x01000193;
 
-		return hash | (hash == 0);
+		return hash;
 	}
 
-	template <typename T>
-		T abs(cref<T> a) {
-			return a < 0 ? -a : a;
-		}
-
-	template <typename T>
-		cref<T> min(cref<T> a, cref<T> b) {
-			bool val = a < b;
-			return val ? a : b;
-		}
-
 	template <typename T1, typename T2>
-		bool cmpeq(cref<T1> a, cref<T2> b) {
-			return a == b;
-		}
+	bool cmpeq(cref<T1> a, cref<T2> b) {
+		return a == b;
+	}
 
 	bool cmpeq(cstr a, cstr b) {
 		cstr p1 = a, p2 = b;
@@ -43,20 +33,6 @@ export namespace core {
 
 		return true;
 	}
-
-	template <typename T>
-		cref<T> max(cref<T> a, cref<T> b) {
-			bool val = a > b;
-			return val ? a : b;
-		}
-
-	template <typename T>
-		T clamp(T a, T min, T max) {
-			T tmp = a;
-			tmp = tmp < min ? min : tmp;
-			tmp = tmp > max ? max : tmp;
-			return tmp;
-		}
 
 	template <typename T>
 	struct operations_base {
@@ -85,22 +61,22 @@ export namespace core {
 	struct operations: public operations_base<T> {};
 
 	template <typename T>
-		u32 hash(cref<T> key) {
-			return operations<T>::hash(key);
-		}
+	u32 hash(cref<T> key) {
+		return operations<T>::hash(key);
+	}
 
 	template <typename T>
-		void copy(cref<T> src, ref<T> dst) {
-			operations<T>::copy(src, dst);
-		}
+	void copy(cref<T> src, ref<T> dst) {
+		operations<T>::copy(src, dst);
+	}
 
 	template <typename T>
-		T copy(cref<T> src) {
-			return operations<T>::copy(src);
-		}
+	T copy(cref<T> src) {
+		return operations<T>::copy(src);
+	}
 
 	template <typename T>
-		void swap(ref<T> a, ref<T> b) {
-			operations<T>::swap(a, b);
-		}
+	void swap(ref<T> a, ref<T> b) {
+		operations<T>::swap(a, b);
+	}
 };

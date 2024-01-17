@@ -4,6 +4,7 @@ module;
 #include <immintrin.h>
 
 export module core.simd;
+import core.types;
 
 export namespace core {
 	enum {

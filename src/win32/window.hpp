@@ -4,6 +4,7 @@ module;
 #include <vulkan/vulkan.h>
 
 export module win32.window;
+import core.types;
 import core.memory;
 import core.string;
 import core.vector;
@@ -55,7 +56,7 @@ export namespace jolly {
 		math::vec2i fbsize(u32 id) const; // size of framebuffer
 
 		core::handle handle;
-		core::ptr<vk_surface> surface; // stores rendering device info
+		core::mem<vk_surface> surface; // stores rendering device info
 		core::table<u32, core::handle> windows;
 		core::vector<core::vector<pfn_win_cb>> callbacks;
 		core::mutex busy;

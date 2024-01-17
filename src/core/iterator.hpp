@@ -1,8 +1,5 @@
-module;
-
-#include "core.h"
-
 export module core.iterator;
+import core.types;
 
 export namespace core {
 	template <typename T>
@@ -41,11 +38,11 @@ export namespace core {
 	};
 
 	struct range {
-		range(u32 end) : _beg(0), _end(end), _inc(1) {}
-		range(u32 beg, u32 end) : _beg(beg), _end(end), _inc(0) {
+		range(i32 end) : _beg(0), _end(end), _inc(1) {}
+		range(i32 beg, i32 end) : _beg(beg), _end(end), _inc(0) {
 			_inc = beg <= end ? 1 : -1;
 		}
-		range(u32 beg, u32 end, u32 inc) : _beg(beg), _end(end), _inc(inc) {}
+		range(i32 beg, i32 end, i32 inc) : _beg(beg), _end(end), _inc(inc) {}
 
 		struct iterator {
 			iterator(u32 idx, u32 inc)

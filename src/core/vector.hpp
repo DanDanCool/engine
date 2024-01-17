@@ -4,6 +4,7 @@ module;
 #include <initializer_list>
 
 export module core.vector;
+import core.types;
 import core.traits;
 import core.memory;
 import core.simd;
@@ -71,7 +72,7 @@ export namespace core {
 
 		void _allocate(u32 sz) {
 			sz = max<u32>(sz, VECTOR_DEFAULT_SIZE);
-			memptr ptr = alloc256(sz * sizeof(type));
+			auto ptr = alloc256(sz * sizeof(type));
 			data = (type*)ptr.data;
 			reserve = (u32)ptr.size / sizeof(type);
 		}
@@ -88,7 +89,7 @@ export namespace core {
 		}
 
 		void resize(u32 sz) {
-			memptr ptr = alloc256(sz * sizeof(type));
+			auto ptr = alloc256(sz * sizeof(type));
 			copy256((u8*)data, ptr.data, align_size256(reserve * sizeof(type)));
 			free256((void*)data);
 			data = (type*)ptr.data;
@@ -160,7 +161,7 @@ export namespace core {
 			}
 
 			cref<this_type> data;
-			u32 index;
+			i32 index;
 		};
 
 		struct forward_iterator : public iterator_base {

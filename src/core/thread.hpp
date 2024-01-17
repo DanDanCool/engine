@@ -3,15 +3,16 @@ module;
 #include "core.h"
 
 export module core.thread;
+import core.types;
 import core.memory;
 
 export namespace core {
 	struct thread;
-	typedef int (*pfn_thread)(ref<thread>, ptr<void>&& args);
+	typedef int (*pfn_thread)(ref<thread>, mem<void>&& args);
 
 	struct thread {
 		thread() = default;
-		thread(pfn_thread start, ptr<void>&& args);
+		thread(pfn_thread start, mem<void>&& args);
 
 		ref<thread> operator=(thread&& other) {
 			handle = forward_data(other.handle);

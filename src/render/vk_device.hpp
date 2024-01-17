@@ -4,7 +4,9 @@ module;
 #include <vulkan/vulkan.h>
 
 export module vulkan.device;
+import core.types;
 import core.string;
+import core.simd;
 import core.memory;
 import core.tuple;
 import core.vector;
@@ -137,7 +139,7 @@ export namespace jolly {
 		, _gpus(0)
 		, _gpu(U32_MAX)
 		, _frame(0) {
-			_window = core::ptr_create<window>(name, sz);
+			_window = core::mem_create<window>(name, sz);
 			_window->create("test", { 480, 480 });
 
 			// enable validation layers
@@ -205,13 +207,6 @@ export namespace jolly {
 			fn(_instance, &msg_info, nullptr, &_debugmsg);
 
 			_window->vk_init(*this);
-
-			// create gpus
-			count = 0;
-			vkEnumeratePhysicalDevices(_instance, &count, nullptr);
-			core::vector<VkPhysicalDevice> devices(count);
-			vkEnumeratePhysicalDevices(_instance, &count, devices.data);
-			devices.size = count;
 
 			auto device_suitable = [](ref<vk_gpu> gpu, VkSurfaceKHR surface) {
 				VkPhysicalDeviceProperties props{};
@@ -334,6 +329,13 @@ export namespace jolly {
 				bool discrete = props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
 				return discrete && all_queues && all_extensions && swapchain;
 			};
+
+			// create gpus
+			count = 0;
+			vkEnumeratePhysicalDevices(_instance, &count, nullptr);
+			core::vector<VkPhysicalDevice> devices(count);
+			vkEnumeratePhysicalDevices(_instance, &count, devices.data);
+			devices.size = count;
 
 			VkSurfaceKHR surface = _window->vk_main_swapchain().surface;
 			for (auto device : devices) {
@@ -853,7 +855,7 @@ export namespace jolly {
 			_frame = (_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 		}
 
-		core::ptr<window> _window;
+		core::mem<window> _window;
 		VkInstance _instance;
 		VkDebugUtilsMessengerEXT _debugmsg;
 

@@ -3,6 +3,7 @@ module;
 #include <core/core.h>
 
 export module jolly.ui_system;
+import core.types;
 import core.log;
 import core.lock;
 import core.iterator;

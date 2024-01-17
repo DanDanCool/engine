@@ -5,6 +5,7 @@ module;
 #include <tuple>
 
 export module core.tuple;
+import core.types;
 import core.memory;
 import core.traits;
 import core.simd;
@@ -78,6 +79,7 @@ export namespace core {
 	struct array {
 		static constexpr u32 size = N;
 		using type = T;
+		using this_type = array<T, N>;
 
 		array() : data(), index(0) {
 			zero8((u8*)data, sizeof(data));
@@ -87,8 +89,56 @@ export namespace core {
 			data[index++] = val;
 		}
 
-		ref<type> operator[](u32 idx) {
+		cref<type> operator[](u32 idx) const {
 			return data[idx];
+		}
+
+		struct iterator_base {
+			iterator_base(cref<this_type> in, u32 idx)
+			: data(in), index(idx) {}
+
+			bool operator!=(cref<iterator_base> other) const {
+				return index != other.index;
+			}
+
+			cref<type> operator*() const {
+				return data[index];
+			}
+
+			cref<this_type> data;
+			i32 index;
+		};
+
+		struct forward_iterator : public iterator_base {
+			using iterator_base::iterator_base;
+			ref<forward_iterator> operator++() {
+				iterator_base::index++;
+				return *this;
+			}
+		};
+
+		struct reverse_iterator : public iterator_base {
+			using iterator_base::iterator_base;
+			ref<reverse_iterator> operator++() {
+				iterator_base::index--;
+				return *this;
+			}
+		};
+
+		forward_iterator begin() const {
+			return forward_iterator(*this, 0);
+		}
+
+		forward_iterator end() const {
+			return forward_iterator(*this, index);
+		}
+
+		reverse_iterator rbegin() const {
+			return reverse_iterator(*this, index - 1);
+		}
+
+		reverse_iterator rend() const {
+			return reverse_iterator(*this, -1);
 		}
 
 		type data[size];
@@ -209,7 +259,7 @@ export namespace core {
 				return 0;
 			};
 
-			swallow(helper(forward_data(other), *this, uint_constant<Indices>{})...);
+			(helper(forward_data(other), *this, uint_constant<Indices>{}), ...);
 		}
 
 		template<u32... Indices>
@@ -219,7 +269,7 @@ export namespace core {
 				return 0;
 			};
 
-			swallow(helper(other, *this, uint_constant<Indices>{})...);
+			(helper(other, *this, uint_constant<Indices>{}), ...);
 		}
 
 		template<std::size_t I>
@@ -307,7 +357,7 @@ export namespace core {
 					return 0;
 				};
 
-				swallow(helper(data.get<Indices>()[last], data.get<Indices>()[idx], uint_constant<Indices>{})...);
+				(helper(data.get<Indices>()[last], data.get<Indices>()[idx], uint_constant<Indices>{}), ...);
 			};
 
 			del_helper(data, idx, --size, sequence_type{});
@@ -316,12 +366,12 @@ export namespace core {
 		template<u32... Indices>
 		void allocate(u32 sz, index_sequence<Indices...>) {
 			auto helper = []<typename T>(ref<T*> arg, u32 sz) {
-				memptr ptr = alloc256(sz * sizeof(T));
+				auto ptr = alloc256(sz * sizeof(T));
 				arg = (T*)ptr.data;
 				return 0;
 			};
 
-			swallow(helper(data.get<Indices>(), sz)...);
+			(helper(data.get<Indices>(), sz), ...);
 			reserve = sz;
 		}
 
@@ -338,7 +388,7 @@ export namespace core {
 				return 0;
 			};
 
-			swallow(helper(data.get<Indices>(), size)...);
+			(helper(data.get<Indices>(), size), ...);
 		}
 
 		template <u32... Indices>
@@ -350,7 +400,7 @@ export namespace core {
 				return 0;
 			};
 
-			swallow(helper(src.get<Indices>(), data.get<Indices>(), count)...);
+			(helper(src.get<Indices>(), data.get<Indices>(), count), ...);
 		};
 
 
@@ -361,7 +411,7 @@ export namespace core {
 				return 0;
 			};
 
-			swallow(helper(get<Indices>(idx), forward_data(vals), uint_constant<Indices>{})...);
+			(helper(get<Indices>(idx), forward_data(vals), uint_constant<Indices>{}), ...);
 		}
 
 		tuple_type data;
