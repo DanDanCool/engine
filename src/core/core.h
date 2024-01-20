@@ -16,8 +16,6 @@ namespace assert {
 		return (enum)res; \
 	} \
 
-#define elif else if
-
 #ifdef JOLLY_WIN32
 #ifdef JOLLY_EXPORT
 #define JOLLY_API __declspec(dllexport)
@@ -59,9 +57,5 @@ namespace assert {
 	if (!(expr)) { \
 		JOLLY_DEBUG_BREAK(); \
 	}
-
-#define LOG_INFO(...) core::logger::instance().info(core::format_string(__VA_ARGS__))
-#define LOG_WARN(...) core::logger::instance().warn(core::format_string(__VA_ARGS__))
-#define LOG_CRIT(...) core::logger::instance().crit(core::format_string(__VA_ARGS__))
 
 #define forward_data(...) static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)

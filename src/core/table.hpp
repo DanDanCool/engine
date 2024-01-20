@@ -239,7 +239,7 @@ export namespace core {
 
 		struct iterator_keys: public iterator_base {
 			using iterator_base::iterator_base;
-			ref<key_type> operator*() const {
+			cref<key_type> operator*() const {
 				u32 index = iterator_base::index;
 				auto& keys = iterator_base::keys;
 				auto& vals = iterator_base::vals;
@@ -249,7 +249,7 @@ export namespace core {
 
 		struct iterator_vals: public iterator_base {
 			using iterator_base::iterator_base;
-			ref<val_type> operator*() const {
+			cref<val_type> operator*() const {
 				u32 index = iterator_base::index;
 				auto& keys = iterator_base::keys;
 				auto& vals = iterator_base::vals;
@@ -269,19 +269,19 @@ export namespace core {
 			}
 		};
 
-		auto keys() {
+		auto keys() const {
 			return view_base<iterator_keys>(_keys, _vals);
 		}
 
-		auto vals() {
+		auto vals() const {
 			return view_base<iterator_vals>(_keys, _vals);
 		}
 
-		auto begin() {
+		auto begin() const {
 			return iterator_items(_keys, _vals, 0);
 		}
 
-		auto end() {
+		auto end() const {
 			return iterator_items(_keys, _vals, size);
 		}
 

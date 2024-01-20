@@ -468,7 +468,7 @@ namespace core::impl::ryu {
 		return f64_decimal{output, exp};
 	}
 
-	void to_chars(f64_decimal v, bool sign, ref<fmtbuf> buffer) {
+	void to_chars(f64_decimal v, bool sign, ref<buffer> buffer) {
 		// Step 5: Print the decimal representation.
 		if (sign) {
 			buffer.write('-');
@@ -585,7 +585,7 @@ namespace core::impl::ryu {
 		return true;
 	}
 
-	export void ryu_f64_dtos(f64 arg, ref<fmtbuf> result) {
+	export void ryu_f64_dtos(f64 arg, ref<buffer> result) {
 		// Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
 		u64 bits = double_to_bits(arg);
 

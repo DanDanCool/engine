@@ -12,116 +12,9 @@ import core.simd;
 import core.iterator;
 import core.file;
 import core.lock;
-import core.traits;
-import core.impl.ryu_f32;
-import core.impl.ryu_f64;
-
-#define FORMAT_INT(type) \
-void format(type arg, ref<fmtbuf> buf) { format((i64)arg, buf); }
+import core.format;
 
 export namespace core {
-	using fmtbuf = buffer_base<BLOCK_1024>;
-
-	void format(cref<string> arg, ref<fmtbuf> buf) {
-		buf.write(arg);
-	}
-
-	void format(cstr arg, ref<fmtbuf> buf) {
-		i8* p = (i8*)arg;
-		while (*p) {
-			buf.write((u8)*p);
-			p++;
-		}
-	}
-
-	void format(i8 arg, ref<fmtbuf> buf) {
-		buf.write((u8)arg);
-	}
-
-	void format(i64 arg, ref<fmtbuf> buf) {
-		if (arg == 0) {
-			buf.write('0');
-			return;
-		}
-
-		array<i8, 20> data;
-
-		i64 tmp = abs(arg);
-		i64 div = 10;
-
-		while (tmp) {
-			i64 val = tmp % div;
-			tmp -= val;
-			data.add('0' + (i8)val);
-			tmp /= div;
-		}
-
-		if (arg < 0) {
-			buf.write((u8)'-');
-		}
-
-		for (i8 digit : reverse(data)) {
-			if (buf.index >= fmtbuf::size) return;
-			buf.write((u8)digit);
-		}
-	}
-
-	void format(bool arg, ref<fmtbuf> buf) {
-		if (arg) {
-			format("true", buf);
-		} else {
-			format("false", buf);
-		}
-	}
-
-	void format(f64 arg, ref<fmtbuf> buf) {
-		core::impl::ryu::ryu_f64_dtos(arg, buf);
-	}
-
-	void format(f32 arg, ref<fmtbuf> buf) {
-		core::impl::ryu::ryu_f32_ftos(arg, buf);
-	}
-
-	FORMAT_INT(i16);
-	FORMAT_INT(i32);
-	FORMAT_INT(u8);
-	FORMAT_INT(u16);
-	FORMAT_INT(u32);
-	FORMAT_INT(u64);
-
-	template <typename... Args>
-	string format_string(cref<string> fmt, Args&&... args) {
-		auto beg = fmt.begin();
-		auto end = fmt.end();
-		fmtbuf buf;
-
-		auto helper = [&](auto&& arg) {
-			while (beg != end) {
-				if (*beg == '%') {
-					++beg;
-					break;
-				}
-
-				buf.write((u8)*beg);
-				++beg;
-			}
-
-			format(arg, buf);
-			return 0;
-		};
-
-		(helper(args), ...);
-		while (beg != end) {
-			buf.write((u8)*beg);
-			++beg;
-		}
-
-		buf.write(0);
-		i8* data = (i8*)buf.data.data;
-		buf.data = nullptr;
-		return string(data, buf.index);
-	}
-
 	struct sink {
 		sink() = default;
 		virtual ~sink() = default;
@@ -214,4 +107,21 @@ export namespace core {
 
 		static inline mem<logger> _instance = nullptr;
 	};
+}
+
+export {
+	template<typename... Args>
+	void LOG_INFO(cref<core::string> fmt, Args&&... args) {
+		core::logger::instance().info(core::format_string(fmt, forward_data(args)...));
+	}
+
+	template<typename... Args>
+	void LOG_WARN(cref<core::string> fmt, Args&&... args) {
+		core::logger::instance().warn(core::format_string(fmt, forward_data(args)...));
+	}
+
+	template<typename... Args>
+	void LOG_CRIT(cref<core::string> fmt, Args&&... args) {
+		core::logger::instance().crit(core::format_string(fmt, forward_data(args)...));
+	}
 }

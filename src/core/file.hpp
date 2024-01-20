@@ -55,7 +55,11 @@ export namespace core {
 			*this = forward_data(other);
 		}
 
-		~file() = default;
+		~file() {
+			if (data.index) {
+				write();
+			}
+		}
 
 		ref<file> operator=(file&& other) {
 			data = forward_data(other.data);
@@ -70,7 +74,7 @@ export namespace core {
 			bytes -= buf.size;
 
 			while (buf.size) {
-				u32 tmp = file::write(membuf{ data.data, data.index });
+				u32 tmp = file_base::write(membuf{ data.data, data.index });
 				if (!tmp) return (u32)bytes;
 				bytes += tmp;
 
@@ -79,6 +83,16 @@ export namespace core {
 			}
 
 			return (u32)bytes;
+		}
+
+		u32 write() {
+			u32 bytes = file_base::write(membuf{ data.data, data.index });
+			data.flush();
+			return bytes;
+		}
+
+		u32 write(u8 c) {
+			return write(membuf{&c, 1});
 		}
 
 		u32 read(ref<buffer> buf) {

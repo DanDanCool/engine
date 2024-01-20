@@ -12,7 +12,11 @@ import core.lock;
 import core.log;
 import core.set;
 import core.atom;
+import core.format;
 import core.iterator;
+import core.file;
+
+import jolly.jml;
 import jolly.ecs;
 
 using namespace core;
@@ -304,14 +308,14 @@ void test_convert() {
 	f64 f_underscore_monster = stod("123_456_789.420_69_69e43");
 	f64 f_underscore_monster2 = 123456789.4206969e43;
 
-	LOG_INFO("test float % test float", f);
-	LOG_INFO("test float % test float", f_dot);
-	LOG_INFO("test float % test float", f_neg);
-	LOG_INFO("test float % test float", f_exp);
-	LOG_INFO("test float % test float", f_nexp);
-	LOG_INFO("test float % test float", f_nexp2);
-	LOG_INFO("test float % test float", f_npow10);
-	LOG_INFO("test float % test float", f_underscore_monster);
+	LOG_INFO("test double % test double", f);
+	LOG_INFO("test double % test double", f_dot);
+	LOG_INFO("test double % test double", f_neg);
+	LOG_INFO("test double % test double", f_exp);
+	LOG_INFO("test double % test double", f_nexp);
+	LOG_INFO("test double % test double", f_nexp2);
+	LOG_INFO("test double % test double", f_npow10);
+	LOG_INFO("test double % test double", f_underscore_monster);
 	std::cout << f_nexp << std::endl;
 
 	f32 f32t = stof("5.0");
@@ -334,6 +338,51 @@ void test_convert() {
 	LOG_INFO("f32 %", 420.69f);
 }
 
+void test_jml() {
+	LOG_INFO("% test jml", DIVIDE);
+
+	core::string s1("test");
+	core::string s2("test");
+
+	LOG_INFO("% equal", s1 == s2);
+
+	jolly::jml_tbl k1{ "test", nullptr, nullptr };
+	jolly::jml_tbl k2{ "test", nullptr, nullptr };
+
+	jolly::jml_tbl k3{ "test", &k1, nullptr };
+	jolly::jml_tbl k4{ "test", &k2, nullptr };
+
+	LOG_INFO("% equal", k1 == k2);
+	LOG_INFO("% equal", k4 == k3);
+
+	jolly::jml_doc doc;
+	doc["test"]["test"]["test"]["test"]["test"]["test"] = 3.0;
+
+	doc["test"]["mystring"] = core::string("hello");
+
+	f64 very_nested = doc["test"]["test"]["test"]["test"]["test"]["test"].get<f64>();
+	LOG_INFO("very_nested is %", very_nested);
+
+	core::string mystring = doc["test"]["mystring"].get<core::string>();
+	LOG_INFO("mystring is %", mystring);
+
+	doc["vector_f64"] = jolly::jml_vector({ 1.0, 2.0, 3.0, 4.0, 5.0, 6.0 });
+	for (auto& val : doc["vector_f64"]) {
+		LOG_INFO("val is %", val.get<f64>());
+	}
+
+	doc["mybool"] = true;
+	LOG_INFO("bool is %", doc["mybool"].get<bool>());
+
+	doc["vector_str"] = jolly::jml_vector({ "hello", "world", "test123" });
+	for (auto& val : doc["vector_str"]) {
+		LOG_INFO("val is %", val.get<core::string>());
+	}
+
+	auto f = fopen("dump.jml", core::access::wo);
+	jml_dump(doc, f);
+}
+
 int main() {
 	test_assert();
 	test_thread();
@@ -348,4 +397,5 @@ int main() {
 
 	test_ecs();
 	test_convert();
+	test_jml();
 }

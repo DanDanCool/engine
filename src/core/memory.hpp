@@ -214,7 +214,13 @@ export namespace core {
 			*this = forward_data(in);
 		}
 
+		any(any&& in)
+		: data(nullptr), deleter(nullptr) {
+			*this = forward_data(in);
+		}
+
 		~any() {
+			if (!data) return;
 			deleter(data);
 		}
 
@@ -229,6 +235,12 @@ export namespace core {
 		ref<any> operator=(mem<T>&& in) {
 			*this = in.data;
 			in.data = nullptr;
+			return *this;
+		}
+
+		ref<any> operator=(any&& in) {
+			data = forward_data(in.data);
+			deleter = in.deleter;
 			return *this;
 		}
 
@@ -313,6 +325,10 @@ export namespace core {
 			zero8(data + index, bytes);
 
 			return membuf{ buf.data + bytes, buf.size - bytes };
+		}
+
+		u64 rem() {
+			return size - index;
 		}
 
 		void flush() {

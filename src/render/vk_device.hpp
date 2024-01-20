@@ -14,6 +14,7 @@ import core.log;
 import core.set;
 import core.file;
 import core.view;
+import core.format;
 import core.iterator;
 import math.vec;
 import vulkan.surface;

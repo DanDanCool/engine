@@ -25,7 +25,6 @@ import core.memory;
 import core.simd;
 
 export namespace core::impl::ryu {
-	using fmtbuf = buffer_base<BLOCK_1024>;
 	// Returns the number of decimal digits in v, which must not contain more than 9 digits.
 	u32 decimalLength9(u32 v) {
 	  // Function precondition: v is not a 10-digit number.
@@ -84,7 +83,7 @@ export namespace core::impl::ryu {
 	  return (((u32) e) * 732923) >> 20;
 	}
 
-	int copy_special_str(ref<fmtbuf> result, bool sign, bool exponent, bool mantissa) {
+	int copy_special_str(ref<buffer> result, bool sign, bool exponent, bool mantissa) {
 	  if (mantissa) {
 		  result.write(membuf{(u8*)"nan", 3});
 		return 3;

@@ -234,7 +234,7 @@ namespace core::impl::ryu {
 		return f32_decimal{ output, exp };
 	}
 
-	void to_chars(f32_decimal v, bool sign, ref<fmtbuf> buffer) {
+	void to_chars(f32_decimal v, bool sign, ref<buffer> buffer) {
 		if (sign) {
 			buffer.write('-');
 		}
@@ -295,7 +295,7 @@ namespace core::impl::ryu {
 		}
 	}
 
-	export void ryu_f32_ftos(f32 arg, ref<fmtbuf> buffer) {
+	export void ryu_f32_ftos(f32 arg, ref<buffer> buffer) {
 		// Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
 		u32 bits = float_to_bits(arg);
 
