@@ -13,7 +13,8 @@ import core.iterator;
 import core.file;
 import core.lock;
 import core.traits;
-import core.impl.schubfach;
+import core.impl.ryu_f32;
+import core.impl.ryu_f64;
 
 #define FORMAT_INT(type) \
 void format(type arg, ref<fmtbuf> buf) { format((i64)arg, buf); }
@@ -74,11 +75,11 @@ export namespace core {
 	}
 
 	void format(f64 arg, ref<fmtbuf> buf) {
-		core::impl::schubfach64(arg, buf);
+		core::impl::ryu::ryu_f64_dtos(arg, buf);
 	}
 
 	void format(f32 arg, ref<fmtbuf> buf) {
-		core::impl::schubfach64((f64)arg, buf);
+		core::impl::ryu::ryu_f32_ftos(arg, buf);
 	}
 
 	FORMAT_INT(i16);

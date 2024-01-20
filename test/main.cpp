@@ -1,4 +1,6 @@
 #include <core/core.h>
+#include <iostream>
+#include <string>
 
 import core.types;
 import core.vector;
@@ -294,14 +296,42 @@ void test_convert() {
 	f64 f = stod("5.0");
 	f64 f_dot = stod("5.");
 	f64 f_neg = stod("-8432.234");
-	f64 f_exp = stod("3344.3e10");
-	f64 f_nexp = stod("-3.45321e-66");
+	f64 f_exp = stod("334_4.3e10");
+	f64 f_nexp = stod("-3.45_321e-66");
+	f64 f_nexp2 = -3.45321e-66;
+	f64 f_nexp3 = std::stod("-3.45321e-66");
+	f64 f_npow10 = stod("21e-5");
+	f64 f_underscore_monster = stod("123_456_789.420_69_69e43");
+	f64 f_underscore_monster2 = 123456789.4206969e43;
 
 	LOG_INFO("test float % test float", f);
 	LOG_INFO("test float % test float", f_dot);
 	LOG_INFO("test float % test float", f_neg);
 	LOG_INFO("test float % test float", f_exp);
 	LOG_INFO("test float % test float", f_nexp);
+	LOG_INFO("test float % test float", f_nexp2);
+	LOG_INFO("test float % test float", f_npow10);
+	LOG_INFO("test float % test float", f_underscore_monster);
+	std::cout << f_nexp << std::endl;
+
+	f32 f32t = stof("5.0");
+	f32 f32t_dot = stof("5.");
+	f32 f32t_neg = stof("-8432.234");
+	f32 stdtest = std::stof("-8432.234");
+	f32 f32t_exp = stof("3344.3e10");
+	f32 f32t_nexp = stof("-3.45321e-66");
+	f32 f32t_nexp2 = -3.45321e-66;
+	f32 f32t_npow10 = stof("21e-5");
+
+	LOG_INFO("test float % test float", f32t);
+	LOG_INFO("test float % test float", f32t_dot);
+	LOG_INFO("test float % test float", f32t_neg);
+	LOG_INFO("test float % test float", f32t_exp);
+	LOG_INFO("test float % test float", f32t_nexp);
+	LOG_INFO("test float % test float", f32t_nexp2);
+	LOG_INFO("test float % test float", f32t_npow10);
+
+	LOG_INFO("f32 %", 420.69f);
 }
 
 int main() {

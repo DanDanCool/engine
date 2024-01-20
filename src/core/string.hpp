@@ -10,6 +10,9 @@ import core.iterator;
 import core.operations;
 import core.tuple;
 
+import core.impl.ryu_f32;
+import core.impl.ryu_f64;
+
 export namespace core {
 	template<typename T>
 	struct string_base {
@@ -189,7 +192,7 @@ export namespace core {
 	i64 stoi_impl(cstr in, i64 base, auto transform, i32 end = BLOCK_64) {
 		// maximum length of a number that can be encoded by i64 is 19 characters
 		array<i8, 20> data;
-		for (i32 i : range( end)) {
+		for (i32 i : range(end)) {
 			if (!in[i]) break;
 			if (in[i] == '_') continue;
 
@@ -245,61 +248,10 @@ export namespace core {
 	}
 
 	f64 stod(cstr in) {
-		auto transform = [](i8 in) {
-			i8 tmp = in - '0';
-			JOLLY_CORE_ASSERT(tmp < 10);
-			return tmp;
-		};
+		return core::impl::ryu::ryu_f64_stod(in);
+	}
 
-		i32 deci = -1;
-		i32 expo = -1;
-		i32 size = -1;
-
-		for (i32 i : range(BLOCK_64)) {
-			if (!in[i]) {
-				size = i;
-				break;
-			}
-			if (in[i] == '.')
-				deci = i;
-			if (in[i] == 'e')
-				expo = i;
-		}
-
-		i64 sign = in[0] == '-' ? -1 : 1;
-		f64 whole = 0, fract = 0, power = 1;
-
-		i64 beg = (in[0] == '-') + (in[0] == '+');
-		i64 end = (deci == -1 ? size : deci) - beg;
-		whole = (f64)stoi_impl(in + beg, 10, transform, end);
-
-		if (deci != -1) {
-			i64 offset = deci + 1;
-			i64 end = (expo == -1 ? size : expo) - offset;
-			fract = (f64)stoi_impl(in + offset, 10, transform, end);
-
-			f64 div = 1;
-			for (i32 i : range(end)) {
-				div *= 10;
-			}
-
-			fract /= div;
-		}
-
-		if (expo != -1) {
-			i64 sign = in[expo + 1] == '-' ? -1 : 1;
-			i64 beg = 1 + (in[expo + 1] == '-') + (in[expo + 1] == '+');
-			i64 count = stoi_impl(in + beg + expo, 10, transform);
-
-			for (i32 i : range((i32)count)) {
-				power *= 10;
-			}
-
-			if (sign == -1) {
-				power = 1 / power;
-			}
-		}
-
-		return (whole + fract) * power * sign;
+	f32 stof(cstr in) {
+		return core::impl::ryu::ryu_f32_stof(in);
 	}
 };
