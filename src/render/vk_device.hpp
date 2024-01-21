@@ -351,7 +351,7 @@ export namespace jolly {
 
 			_window->vk_swapchain_create();
 			core::vector<binding_description> bindings{
-				binding_description( forward_data(core::vector<vertex_attribute>{ {vertex_data::vec2, 0}, {vertex_data::vec3, 1} }), vertex_input::vertex ),
+				binding_description( core::vector<vertex_attribute>{ {vertex_data::vec2, 0}, {vertex_data::vec3, 1} }, vertex_input::vertex ),
 			};
 
 			auto& gpu = main_gpu();

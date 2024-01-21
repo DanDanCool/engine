@@ -18,6 +18,7 @@ import core.file;
 
 import jolly.jml;
 import jolly.ecs;
+import jolly.spirv.parser;
 
 using namespace core;
 
@@ -383,6 +384,10 @@ void test_jml() {
 	jml_dump(doc, f);
 }
 
+void test_spirv() {
+	jolly::spirv_parse("../assets/shaders/texture");
+}
+
 int main() {
 	test_assert();
 	test_thread();
@@ -398,4 +403,5 @@ int main() {
 	test_ecs();
 	test_convert();
 	test_jml();
+	test_spirv();
 }

@@ -37,8 +37,13 @@ if host.os == jmake.Platform.WIN32:
     test.define('WIN32_LEAN_AND_MEAN', 1)
 
 vulkan = jmake.builtin('vulkan')
+spirv_reflect = jmake.package("spirv_reflect", "https://github.com/DanDanCool/SPIRV-Reflect")
+
 engine.depend(vulkan)
+engine.depend(spirv_reflect)
+
 test.depend(vulkan)
+test.depend(spirv_reflect)
 
 workspace.add(engine)
 workspace.add(test)
@@ -48,6 +53,7 @@ def compileshaders(workspace, args):
     for shader in p.glob('*'):
         if shader.suffix not in [ '.vert', '.frag' ]:
             continue
+        print(f"compiling shader {str(shader)}...")
         cmd = [ 'glslc', str(shader), '-o', str(p / f"{shader.name}.spv") ]
         res = subprocess.run(cmd, capture_output=True, text=True)
         print(res.stdout)

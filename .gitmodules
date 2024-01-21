@@ -1,0 +1,3 @@
+[submodule "lib/spirv_reflect"]
+	path = lib/spirv_reflect
+	url = https://github.com/DanDanCool/SPIRV-Reflect
