@@ -21,11 +21,15 @@ export namespace core {
 	}
 
 	void format(cstr arg, ref<buffer> buf) {
-		i8* p = (i8*)arg;
-		while (*p) {
-			buf.write((u8)*p);
+		u32 i = 0;
+		while (arg[i]) {
+			buf.write((u8)arg[i]);
 			p++;
 		}
+	}
+
+	void format(strv arg, ref<buffer> buf) {
+		for (auto i : range(arg.))
 	}
 
 	void format(i8 arg, ref<buffer> buf) {
@@ -84,7 +88,7 @@ export namespace core {
 	FORMAT_INT(u64);
 
 	template <typename... Args>
-	string format_string(cref<string> fmt, Args&&... args) {
+	string format_string(cref<string> fmt, fwd<Args>... args) {
 		auto beg = fmt.begin();
 		auto end = fmt.end();
 		buffer buf;
@@ -111,7 +115,7 @@ export namespace core {
 		}
 
 		buf.write(0);
-		i8* data = (i8*)buf.data.data;
+		ptr<i8> data = (ptr<i8>)buf.data.data;
 		buf.data = nullptr;
 		return string(data, buf.index);
 	}

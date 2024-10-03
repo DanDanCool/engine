@@ -101,12 +101,4 @@ export namespace core::impl::ryu {
 	  result.write(membuf{(u8*)"0.0", 3});
 	  return sign + 3;
 	}
-
-	u32 float_to_bits(float f) {
-	  return *(u32*)&f;
-	}
-
-	u64 double_to_bits(double d) {
-	  return *(u64*)&d;
-	}
 }

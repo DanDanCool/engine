@@ -10,10 +10,10 @@ module core.lock;
 namespace core {
 	mutex::mutex()
 	: handle() {
-		handle = (void*)CreateMutex(NULL, false, NULL);
+		handle = (ptr<void>)CreateMutex(NULL, false, NULL);
 	}
 
-	mutex::mutex(mutex&& other)
+	mutex::mutex(fwd<mutex> other)
 	: handle() {
 		*this = forward_data(other);
 	}
@@ -23,7 +23,7 @@ namespace core {
 		CloseHandle((HANDLE)handle.data());
 	}
 
-	ref<mutex> mutex::operator=(mutex&& other) {
+	ref<mutex> mutex::operator=(fwd<mutex> other) {
 		handle = forward_data(other.handle);
 		other.handle = nullptr;
 		return *this;
@@ -44,10 +44,10 @@ namespace core {
 
 	semaphore::semaphore(u32 max, u32 count)
 	: handle() {
-		handle = (void*)CreateSemaphore(NULL, count, max, NULL);
+		handle = (ptr<void>)CreateSemaphore(NULL, count, max, NULL);
 	}
 
-	semaphore::semaphore(semaphore&& other)
+	semaphore::semaphore(fwd<semaphore> other)
 	: handle() {
 		*this = forward_data(other);
 	}
@@ -78,12 +78,12 @@ namespace core {
 
 	rwlock::rwlock()
 	: handle() {
-		SRWLOCK* lock = (SRWLOCK*)alloc8((u32)sizeof(SRWLOCK)).data;
+		ptr<SRWLOCK> lock = (ptr<SRWLOCK>)alloc8((u32)sizeof(SRWLOCK)).data;
 		InitializeSRWLock(lock);
-		handle = (void*)lock;
+		handle = (ptr<void>)lock;
 	}
 
-	rwlock::rwlock(rwlock&& other)
+	rwlock::rwlock(fwd<rwlock> other)
 	: handle() {
 		*this = forward_data(other);
 	}
@@ -92,33 +92,33 @@ namespace core {
 		// SRWLOCK can be safely deleted as long as there are no acquires
 	}
 
-	ref<rwlock> rwlock::operator=(rwlock&& other) {
+	ref<rwlock> rwlock::operator=(fwd<rwlock> other) {
 		handle = forward_data(other.handle);
 		other.handle = nullptr;
 		return *this;
 	}
 
 	bool rwlock::tryracquire() const {
-		return TryAcquireSRWLockShared((SRWLOCK*)handle.data);
+		return TryAcquireSRWLockShared((ptr<SRWLOCK>)handle.data);
 	}
 
 	bool rwlock::trywacquire() const {
-		return TryAcquireSRWLockExclusive((SRWLOCK*)handle.data);
+		return TryAcquireSRWLockExclusive((ptr<SRWLOCK>)handle.data);
 	}
 
 	void rwlock::racquire() const {
-		AcquireSRWLockShared((SRWLOCK*)handle.data);
+		AcquireSRWLockShared((ptr<SRWLOCK>)handle.data);
 	}
 
 	void rwlock::rrelease() const {
-		ReleaseSRWLockShared((SRWLOCK*)handle.data);
+		ReleaseSRWLockShared((ptr<SRWLOCK>)handle.data);
 	}
 
 	void rwlock::wacquire() const {
-		AcquireSRWLockExclusive((SRWLOCK*)handle.data);
+		AcquireSRWLockExclusive((ptr<SRWLOCK>)handle.data);
 	}
 
 	void rwlock::wrelease() const {
-		ReleaseSRWLockExclusive((SRWLOCK*)handle.data);
+		ReleaseSRWLockExclusive((ptr<SRWLOCK>)handle.data);
 	}
 }

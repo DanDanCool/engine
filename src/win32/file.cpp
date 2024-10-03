@@ -12,13 +12,13 @@ namespace core {
 	int convert_flags(access _access);
 	int get_fd(cref<handle> handle);
 
-	file_base::file_base(cref<string> fname, access _access)
+	file_base::file_base(strv fname, access _access)
 	: handle() {
 		int fd = 0;
 		int oflag = convert_flags(_access) | _O_CREAT;
-		_sopen_s(&fd, fname, oflag, _SH_DENYNO, _S_IWRITE);
+		_sopen_s(&fd, string(fname), oflag, _SH_DENYNO, _S_IWRITE);
 
-		handle = (void*)(i64)fd;
+		handle = (ptr<void>)(i64)fd;
 	}
 
 	file_base::~file_base() {

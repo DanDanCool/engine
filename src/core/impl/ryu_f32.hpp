@@ -297,7 +297,7 @@ namespace core::impl::ryu {
 
 	export void ryu_f32_ftos(f32 arg, ref<buffer> buffer) {
 		// Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
-		u32 bits = float_to_bits(arg);
+		u32 bits = cast<u32>(arg);
 
 		// Decode bits into sign, mantissa, and exponent.
 		bool ieeeSign = ((bits >> (FLOAT_MANTISSA_BITS + FLOAT_EXPONENT_BITS)) & 1) != 0;

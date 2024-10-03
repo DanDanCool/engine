@@ -24,7 +24,7 @@ export namespace core {
 			_allocate(sz);
 		}
 
-		vector(this_type&& other)
+		vector(fwd<this_type> other)
 		: data(nullptr), reserve(0), size(0) {
 			*this = forward_data(other);
 		}
@@ -44,7 +44,7 @@ export namespace core {
 			destroy();
 		}
 
-		ref<this_type> operator=(this_type&& other) {
+		ref<this_type> operator=(fwd<this_type> other) {
 			data = other.data;
 			reserve = other.reserve;
 			size = other.size;
@@ -121,8 +121,8 @@ export namespace core {
 		void del(u32 idx) {
 			size--;
 			core::destroy(&data[idx]);
-			copy8(bytes(data[size]), bytes(data[idx]), sizeof(type));
-			zero8(bytes(data[size]), sizeof(type));
+			copy8((ptr<u8>)&data[size], (ptr<u8>)&data[idx], sizeof(type));
+			zero8((ptr<u8>)&data[size], sizeof(type));
 		}
 
 		u32 find(cref<type> other) const {
@@ -144,65 +144,68 @@ export namespace core {
 			return tmp;
 		}
 
-		ref<type> operator[](u32 idx) const {
-			return data[idx];
+		auto begin() const {
+			return iterator::wforward_seq(data, 0);
 		}
 
-		struct iterator_base {
-			iterator_base(cref<this_type> in, u32 idx)
-			: data(in), index(idx) {}
-
-			bool operator!=(cref<iterator_base> other) const {
-				return index != other.index;
-			}
-
-			ref<type> operator*() const {
-				return data[index];
-			}
-
-			cref<this_type> data;
-			i32 index;
-		};
-
-		struct forward_iterator : public iterator_base {
-			using iterator_base::iterator_base;
-			ref<forward_iterator> operator++() {
-				iterator_base::index++;
-				return *this;
-			}
-		};
-
-		struct reverse_iterator : public iterator_base {
-			using iterator_base::iterator_base;
-			ref<reverse_iterator> operator++() {
-				iterator_base::index--;
-				return *this;
-			}
-		};
-
-		forward_iterator begin() const {
-			return forward_iterator(*this, 0);
+		auto end() const {
+			return iterator::wforward_seq(data, size);
 		}
 
-		forward_iterator end() const {
-			return forward_iterator(*this, size);
+		auto rbegin() const {
+			return iterator::wreverse_seq(*this, size - 1);
 		}
 
-		reverse_iterator rbegin() const {
-			return reverse_iterator(*this, size - 1);
+		auto rend() const {
+			return iterator::wreverse_seq(*this, -1);
 		}
 
-		reverse_iterator rend() const {
-			return reverse_iterator(*this, -1);
-		}
-
-		type* data;
+		ptr<type> data;
 		u32 reserve;
 		u32 size;
 	};
 
+	template<typename T, u32 N>
+	struct array {
+		static constexpr u32 size = N;
+		using type = T;
+		using this_type = array<T, N>;
+
+		array() : data(), index(0) {
+			zero8((ptr<u8>)data, sizeof(data));
+		}
+
+		void add(cref<type> val) {
+			data[index++] = val;
+		}
+
+		cref<type> operator[](u32 idx) const {
+			return data[idx];
+		}
+
+		auto begin() const {
+			return iterator::wforward_seq(&data[0], 0);
+		}
+
+		auto end() const {
+			return iterator::wforward_seq(&data[0], index);
+		}
+
+		auto rbegin() const {
+			return iterator::wreverse_seq(&data[0], index - 1);
+		}
+
+		auto rend() const {
+			return iterator::wreverse_seq(&data[0], -1);
+		}
+
+		type data[size];
+		u32 index;
+	};
+
+
 	template <typename T>
-	struct operations<vector<T>>: public operations_base<vector<T>> {
+	struct op_mem<vector<T>> {
 		using type = T;
 		using vector_type = vector<T>;
 

@@ -19,27 +19,27 @@ import core.iterator;
 export namespace core {
 	struct membuf {
 		u8* data;
-		u64 size;
+		u32 size;
 	};
 
-	membuf alloc256_dbg_win32_(u32 size, const char* fn, int ln);
-	membuf alloc8_dbg_win32_(u32 size, const char* fn, int ln);
+	membuf alloc256_dbg_win32_(u32 size, cstr fn, int ln);
+	membuf alloc8_dbg_win32_(u32 size, cstr fn, int ln);
 
 	membuf alloc256(u32 size) {
 		membuf ptr = {0};
 		size = align_size256(size);
 
 #ifdef JOLLY_WIN32
-		ptr.data = (u8*)_aligned_malloc(size, DEFAULT_ALIGNMENT);
+		ptr.data = (ptr<u8>)_aligned_malloc(size, DEFAULT_ALIGNMENT);
 #else
-		ptr.data = (u8*)aligned_alloc(DEFAULT_ALIGNMENT, size);
+		ptr.data = (ptr<u8>)aligned_alloc(DEFAULT_ALIGNMENT, size);
 #endif
 		ptr.size = size;
 		zero256(ptr.data, (u32)ptr.size);
 		return ptr;
 	}
 
-	void free256(void* ptr) {
+	void free256(ptr<void> ptr) {
 #ifdef JOLLY_WIN32
 		_aligned_free(ptr);
 #else
@@ -50,12 +50,12 @@ export namespace core {
 	membuf alloc8(u32 size) {
 		membuf ptr = {0};
 		ptr.size = size;
-		ptr.data = (u8*)malloc(size);
+		ptr.data = (ptr<u8>)malloc(size);
 		zero8(ptr.data, (u32)ptr.size);
 		return ptr;
 	}
 
-	void free8(void* ptr) {
+	void free8(ptr<void> ptr) {
 		free(ptr);
 	}
 
@@ -68,21 +68,21 @@ export namespace core {
 
 		mem_base() = default;
 
-		mem_base(this_type&& other)
+		mem_base(fwd<this_type> other)
 		: data(nullptr) {
 			*this = forward_data(other);
 		}
 
-		mem_base(type* in)
+		mem_base(ptr<type> in)
 		: data(in) {}
 
-		ref<this_type> operator=(this_type&& other) {
+		ref<this_type> operator=(fwd<this_type> other) {
 			data = other.data;
 			other.data = nullptr;
 			return *this;
 		}
 
-		ref<this_type> operator=(type* in) {
+		ref<this_type> operator=(ptr<type> in) {
 			data = in;
 			return *this;
 		}
@@ -98,18 +98,18 @@ export namespace core {
 			data = nullptr;
 		}
 
-		operator type*() const {
+		operator ptr<type>() const {
 			return data;
 		}
 
 		template <typename S>
 		mem<S> cast() {
-			mem<S> p((S*)data);
+			mem<S> p((ptr<S>)data);
 			data = nullptr;
 			return forward_data(p);
 		}
 
-		type* data;
+		ptr<type> data;
 	};
 
 	template <typename T>
@@ -138,12 +138,12 @@ export namespace core {
 
 		template<typename S>
 		cref<S> get() const {
-			return *(S*)parent_type::data;
+			return *(ptr<S>)parent_type::data;
 		}
 
 		template<typename S>
 		ref<S> get() {
-			return *(S*)parent_type::data;
+			return *(ptr<S>)parent_type::data;
 		}
 	};
 
@@ -151,7 +151,7 @@ export namespace core {
 		handle()
 		: _data(nullptr) {}
 
-		handle(void* in)
+		handle(ptr<void> in)
 		: _data(nullptr) {
 			*this = in;
 		}
@@ -161,7 +161,7 @@ export namespace core {
 			*this = other;
 		}
 
-		ref<handle> operator=(void* in) {
+		ref<handle> operator=(ptr<void> in) {
 			_data = in;
 			return *this;
 		}
@@ -192,8 +192,8 @@ export namespace core {
 	};
 
 	template<typename T, typename... Args>
-	mem<T> mem_create(Args&&... args) {
-		T* data = (T*)alloc8(sizeof(T)).data;
+	mem<T> mem_create(fwd<Args>... args) {
+		ptr<T> data = (ptr<T>)alloc8(sizeof(T)).data;
 		data = new (data) T(forward_data(args)...);
 		return mem<T>(data);
 	}
@@ -203,18 +203,18 @@ export namespace core {
 		any() = default;
 
 		template<typename T>
-		any(T* in)
+		any(ptr<T> in)
 		: data(nullptr), deleter(nullptr) {
 			*this = in;
 		}
 
 		template<typename T>
-		any(mem<T>&& in)
+		any(fwd<mem<T>> in)
 		: data(nullptr), deleter(nullptr) {
 			*this = forward_data(in);
 		}
 
-		any(any&& in)
+		any(fwd<any> in)
 		: data(nullptr), deleter(nullptr) {
 			*this = forward_data(in);
 		}
@@ -225,20 +225,20 @@ export namespace core {
 		}
 
 		template<typename T>
-		ref<any> operator=(T* in) {
-			data = (void*)in;
+		ref<any> operator=(ptr<T> in) {
+			data = (ptr<void>)in;
 			deleter = destroy<T>;
 			return *this;
 		}
 
 		template<typename T>
-		ref<any> operator=(mem<T>&& in) {
+		ref<any> operator=(fwd<mem<T>> in) {
 			*this = in.data;
 			in.data = nullptr;
 			return *this;
 		}
 
-		ref<any> operator=(any&& in) {
+		ref<any> operator=(fwd<any> in) {
 			data = forward_data(in.data);
 			deleter = in.deleter;
 			return *this;
@@ -271,10 +271,10 @@ export namespace core {
 			data = alloc256(N).data;
 		}
 
-		buffer_base(u8* buf)
+		buffer_base(ptr<u8> buf)
 		: data(buf), index(0) {}
 
-		buffer_base(buffer_base&& other)
+		buffer_base(fwd<buffer_base> other)
 		: data(), index(0) {
 			*this = other;
 		}
@@ -285,7 +285,7 @@ export namespace core {
 			data = nullptr;
 		}
 
-		ref<buffer_base> operator=(buffer_base&& other) {
+		ref<buffer_base> operator=(fwd<buffer_base> other) {
 			index = other.index;
 			data = forward_data(other.data);
 			return *this;
@@ -293,7 +293,7 @@ export namespace core {
 
 		u32 write(u8 character) {
 			if (index >= size) return 0;
-			u32 idx = (u32)index++;
+			u32 idx = index++;
 			data[idx] = character;
 			return 1;
 		}
@@ -301,7 +301,7 @@ export namespace core {
 		u32 write(u8 character, u32 count) {
 			for (i32 i : range(count)) {
 				if (index >= size) return i;
-				u32 idx = (u32)index++;
+				u32 idx = index++;
 				data[idx] = character;
 			}
 
@@ -309,15 +309,15 @@ export namespace core {
 		}
 
 		membuf write(membuf buf) {
-			u64 bytes = min(buf.size, size - index);
-			copy8(buf.data, data + index, (u32)bytes);
+			u32 bytes = min(buf.size, size - index);
+			copy8(buf.data, data + index, bytes);
 
 			index += bytes;
 			return membuf{ buf.data + bytes, buf.size - bytes };
 		}
 
 		membuf read(membuf buf) {
-			u64 bytes = min(buf.size, index);
+			u32 bytes = min(buf.size, index);
 			copy8(data, buf.data, bytes);
 
 			index -= bytes;
@@ -327,7 +327,7 @@ export namespace core {
 			return membuf{ buf.data + bytes, buf.size - bytes };
 		}
 
-		u64 rem() {
+		u32 rem() {
 			return size - index;
 		}
 
@@ -336,13 +336,13 @@ export namespace core {
 			index = 0;
 		}
 
-		ref<u8> operator[](u64 idx) {
+		ref<u8> operator[](u32 idx) {
 			JOLLY_CORE_ASSERT(idx < size);
-			return data[(u32)idx];
+			return data[idx];
 		}
 
 		mem<u8> data;
-		u64 index;
+		u32 index;
 	};
 
 	using buffer = buffer_base<BLOCK_4096>;

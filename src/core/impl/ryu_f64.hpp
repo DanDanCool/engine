@@ -587,7 +587,7 @@ namespace core::impl::ryu {
 
 	export void ryu_f64_dtos(f64 arg, ref<buffer> result) {
 		// Step 1: Decode the floating-point number, and unify normalized and subnormal cases.
-		u64 bits = double_to_bits(arg);
+		u64 bits = cast<u64>(arg);
 
 		// Decode bits into sign, mantissa, and exponent.
 		bool ieeeSign = ((bits >> (DOUBLE_MANTISSA_BITS + DOUBLE_EXPONENT_BITS)) & 1) != 0;

@@ -6,7 +6,7 @@ export module core.table;
 import core.simd;
 import core.types;
 import core.tuple;
-import core.vector;
+import core.multi_vector;
 import core.tuple;
 import core.operations;
 import core.iterator;

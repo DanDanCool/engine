@@ -128,7 +128,7 @@ export namespace core {
 
 			ref<type> _key = _keys[idx];
 			core::destroy(&_key);
-			zero8(bytes(_key), sizeof(type));
+			zero8((ptr<u8>)&_key, sizeof(type));
 			_hash[idx] = 0;
 
 			size--;

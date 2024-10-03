@@ -71,8 +71,8 @@ export namespace jolly {
 		sparse_set()
 		: sparse(0)
 		, dense(0) {
-			core::set256(U32_MAX, bytes(sparse[0]), sparse.reserve);
-			core::set256(U32_MAX, bytes(dense[0]), sparse.reserve);
+			core::set256(U32_MAX, (ptr<u8>)&sparse[0], sparse.reserve);
+			core::set256(U32_MAX, (ptr<u8>)&dense[0], sparse.reserve);
 		}
 
 		~sparse_set() = default;
@@ -87,7 +87,7 @@ export namespace jolly {
 				u32 start = sparse.reserve;
 				sparse.resize(e.id());
 				u32 size = (sparse.reserve - start) * sizeof(u32);
-				core::set256(U32_MAX, bytes(sparse[start]), size);
+				core::set256(U32_MAX, (ptr<u8>)&sparse[start], size);
 			}
 
 			sparse[e.id()] = dense.size;
@@ -95,7 +95,7 @@ export namespace jolly {
 			u32 reserve = dense.reserve;
 			e_id& entity = dense.add();
 			if (reserve != dense.reserve) {
-				core::set256(U32_MAX, bytes(dense[reserve]), dense.reserve - reserve);
+				core::set256(U32_MAX, (ptr<u8>)&dense[reserve], dense.reserve - reserve);
 			}
 
 			entity = e;

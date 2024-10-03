@@ -38,7 +38,7 @@ export namespace jolly {
 			return name == other.name;
 		}
 
-		core::string name;
+		core::strv name;
 		cptr<jml_tbl> parent;
 		ptr<jml_doc> data;
 	};
@@ -78,10 +78,9 @@ export namespace jolly {
 	struct jml_doc {
 		jml_doc() = default;
 
-		cref<jml_val> get(cref<core::string> key) const {
-			jml_tbl tmp{ core::string(key.data, key.size), nullptr, nullptr };
+		cref<jml_val> get(core::strv key) const {
+			jml_tbl tmp{ key, nullptr, nullptr };
 			cref<jml_val> res = data.get(tmp);
-			tmp.name.data = nullptr;
 			return res;
 		}
 
@@ -93,13 +92,13 @@ export namespace jolly {
 			return data[key];
 		}
 
-		ref<jml_val> operator[](cref<core::string> key);
+		ref<jml_val> operator[](core::strv key);
 
 		cref<jml_val> operator[](cref<jml_tbl> key) const {
 			return get(key);
 		}
 
-		cref<jml_val> operator[](cref<core::string> key) const {
+		cref<jml_val> operator[](core::strv key) const {
 			return get(key);
 		}
 
@@ -110,18 +109,18 @@ export namespace jolly {
 		jml_val() = default;
 
 		template<typename T>
-		jml_val(T&& in)
+		jml_val(fwd<T> in)
 		: data(), type() {
 			*this = forward_data(in);
 		}
 
-		jml_val(jml_val&& in)
+		jml_val(fwd<jml_val> in)
 		: data(), type() {
 			*this = forward_data(in);
 		}
 
 		template<typename T>
-		ref<jml_val> operator=(T&& in) {
+		ref<jml_val> operator=(fwd<T> in) {
 			if (data.data) {
 				data.core::any::~any();
 			}
@@ -132,7 +131,7 @@ export namespace jolly {
 			return *this;
 		}
 
-		ref<jml_val> operator=(jml_val&& in) {
+		ref<jml_val> operator=(fwd<jml_val> in) {
 			data = forward_data(in.data);
 			type = in.type;
 			return *this;
@@ -175,19 +174,18 @@ export namespace jolly {
 			return vec.end();
 		}
 
-		ref<jml_val> operator[](cref<core::string> key) {
+		ref<jml_val> operator[](core::strv key) {
 			JOLLY_ASSERT(type == jml_type::tbl);
 			auto& tbl = data.get<jml_tbl>();
 
-			jml_tbl tmp{ core::string(key.data, key.size), &tbl, nullptr };
+			jml_tbl tmp{ key, &tbl, nullptr };
 			ref<jml_doc> doc = *tbl.data;
 			ref<jml_val> res = doc[tmp];
 
 			if (res.type == jml_type::unk) {
-				res = jml_tbl{ key.copy(), &tbl, &doc };
+				res = jml_tbl{ key, &tbl, &doc };
 			}
 
-			tmp.name.data = nullptr;
 			return res;
 		}
 
@@ -195,15 +193,14 @@ export namespace jolly {
 		jml_type type;
 	};
 
-	ref<jml_val> jml_doc::operator[](cref<core::string> key) {
-		jml_tbl tmp{ core::string(key.data, key.size), nullptr, nullptr };
+	ref<jml_val> jml_doc::operator[](core::strv key) {
+		jml_tbl tmp{ key, nullptr, nullptr };
 		ref<jml_val> res = data[tmp];
 
 		if (res.type == jml_type::unk) {
-			res = jml_tbl{ key.copy(), nullptr, this };
+			res = jml_tbl{ key, nullptr, this };
 		}
 
-		tmp.name.data = nullptr;
 		return res;
 	}
 
@@ -230,7 +227,7 @@ export namespace jolly {
 
 export namespace core {
 	template<>
-	struct operations<jolly::jml_tbl>: public operations_base<jolly::jml_tbl> {
+	struct op_hash<jolly::jml_tbl> {
 		using type = jolly::jml_tbl;
 
 		// based on fnv1a
@@ -240,7 +237,7 @@ export namespace core {
 				h = hash(*key.parent);
 			}
 
-			for (i32 i : range((u32)key.name.size))
+			for (i32 i : range(key.name.size))
 				h = (h ^ key.name[i]) * 0x01000193;
 
 			return h;

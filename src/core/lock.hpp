@@ -20,10 +20,10 @@ export namespace core {
 
 	struct mutex {
 		mutex();
-		mutex(mutex&& other);
+		mutex(fwd<mutex> other);
 		~mutex();
 
-		ref<mutex> operator=(mutex&& other);
+		ref<mutex> operator=(fwd<mutex> other);
 
 		bool tryacquire() const;
 		void acquire() const;
@@ -37,7 +37,7 @@ export namespace core {
 		semaphore(semaphore&& other);
 		~semaphore();
 
-		ref<semaphore> operator=(semaphore&& other);
+		ref<semaphore> operator=(fwd<semaphore> other);
 
 		bool tryacquire() const;
 		void acquire() const;
@@ -49,10 +49,10 @@ export namespace core {
 	// writer priority rw lock
 	struct rwlock {
 		rwlock();
-		rwlock(rwlock&& other);
+		rwlock(fwd<rwlock> other);
 		~rwlock();
 
-		ref<rwlock> operator=(rwlock&& other);
+		ref<rwlock> operator=(fwd<rwlock> other);
 
 		bool tryracquire() const;
 		bool trywacquire() const;

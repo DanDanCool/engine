@@ -16,6 +16,8 @@ export {
 	template <typename T> using cptr = const T*;
 	template <typename T> using ptr = T*;
 
+	template <typename T> using fwd = T&&;
+
 #ifdef __GNUC__
 	typedef __INT8_TYPE__ i8;
 	typedef __INT16_TYPE__ i16;
@@ -65,36 +67,6 @@ export {
 	constexpr u32 U32_MAX = UINT_MAX;
 	constexpr u64 U64_MAX = ULLONG_MAX;
 #endif
-
-	template <typename T, typename S>
-	ref<T> cast(ref<S> val) {
-		return *(T*)&val;
-	}
-
-	template <typename T, typename S>
-	cref<T> cast(cref<S> val) {
-		return *(T*)&val;
-	}
-
-	template <typename T, typename S>
-	ref<T> cast(S* val) {
-		return *(T*)val;
-	}
-
-	template <typename T, typename S>
-	cref<T> cast(const S* val) {
-		return *(T*)val;
-	}
-
-	template <typename S>
-	bool cast(cref<S> val) {
-		return (bool)val;
-	}
-
-	template <typename T>
-	u8* bytes(cref<T> val) {
-		return (u8*)&val;
-	}
 }
 
 export namespace core {

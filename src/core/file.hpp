@@ -21,16 +21,16 @@ export namespace core {
 
 	struct file_base {
 		file_base() = default;
-		file_base(cref<string> fname, access _access);
+		file_base(strv fname, access _access);
 
-		file_base(file_base&& other)
+		file_base(fwd<file_base> other)
 		: handle() {
 			*this = forward_data(other);
 		}
 
 		virtual ~file_base();
 
-		ref<file_base> operator=(file_base&& other) {
+		ref<file_base> operator=(fwd<file_base> other) {
 			handle = other.handle;
 			return *this;
 		}
@@ -47,10 +47,10 @@ export namespace core {
 	struct file : file_base {
 		file() = default;
 
-		file(cref<string> fname, access _access)
+		file(strv fname, access _access)
 		: file_base(fname, _access), data() {}
 
-		file(file&& other)
+		file(fwd<file> other)
 		: file_base() {
 			*this = forward_data(other);
 		}
@@ -61,7 +61,7 @@ export namespace core {
 			}
 		}
 
-		ref<file> operator=(file&& other) {
+		ref<file> operator=(fwd<file> other) {
 			data = forward_data(other.data);
 			file_base::operator=(forward_data(other));
 
@@ -69,7 +69,7 @@ export namespace core {
 		}
 
 		virtual u32 write(membuf buf) {
-			u64 bytes = buf.size;
+			u32 bytes = buf.size;
 			buf = data.write(buf);
 			bytes -= buf.size;
 
@@ -82,7 +82,7 @@ export namespace core {
 				buf = data.write(buf);
 			}
 
-			return (u32)bytes;
+			return bytes;
 		}
 
 		u32 write() {
@@ -110,9 +110,9 @@ export namespace core {
 		buffer data;
 	};
 
-	file fopen(cref<string> fname, access _access) {
+	file fopen(strv fname, access _access) {
 		return file(fname, _access);
 	}
 
-	file_base fopen_raw(cref<string> fname, access _access);
+	file_base fopen_raw(strv fname, access _access);
 }
