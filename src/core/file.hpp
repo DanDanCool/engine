@@ -21,7 +21,7 @@ export namespace core {
 
 	struct file_base {
 		file_base() = default;
-		file_base(strv fname, access _access);
+		file_base(stringview fname, access _access);
 
 		file_base(fwd<file_base> other)
 		: handle() {
@@ -47,7 +47,7 @@ export namespace core {
 	struct file : file_base {
 		file() = default;
 
-		file(strv fname, access _access)
+		file(stringview fname, access _access)
 		: file_base(fname, _access), data() {}
 
 		file(fwd<file> other)
@@ -110,9 +110,9 @@ export namespace core {
 		buffer data;
 	};
 
-	file fopen(strv fname, access _access) {
+	file fopen(stringview fname, access _access) {
 		return file(fname, _access);
 	}
 
-	file_base fopen_raw(strv fname, access _access);
+	file_base fopen_raw(stringview fname, access _access);
 }

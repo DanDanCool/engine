@@ -38,7 +38,7 @@ export namespace jolly {
 			return name == other.name;
 		}
 
-		core::strv name;
+		core::stringview name;
 		cptr<jml_tbl> parent;
 		ptr<jml_doc> data;
 	};
@@ -78,7 +78,7 @@ export namespace jolly {
 	struct jml_doc {
 		jml_doc() = default;
 
-		cref<jml_val> get(core::strv key) const {
+		cref<jml_val> get(core::stringview key) const {
 			jml_tbl tmp{ key, nullptr, nullptr };
 			cref<jml_val> res = data.get(tmp);
 			return res;
@@ -92,13 +92,13 @@ export namespace jolly {
 			return data[key];
 		}
 
-		ref<jml_val> operator[](core::strv key);
+		ref<jml_val> operator[](core::stringview key);
 
 		cref<jml_val> operator[](cref<jml_tbl> key) const {
 			return get(key);
 		}
 
-		cref<jml_val> operator[](core::strv key) const {
+		cref<jml_val> operator[](core::stringview key) const {
 			return get(key);
 		}
 
@@ -174,7 +174,7 @@ export namespace jolly {
 			return vec.end();
 		}
 
-		ref<jml_val> operator[](core::strv key) {
+		ref<jml_val> operator[](core::stringview key) {
 			JOLLY_ASSERT(type == jml_type::tbl);
 			auto& tbl = data.get<jml_tbl>();
 
@@ -193,7 +193,7 @@ export namespace jolly {
 		jml_type type;
 	};
 
-	ref<jml_val> jml_doc::operator[](core::strv key) {
+	ref<jml_val> jml_doc::operator[](core::stringview key) {
 		jml_tbl tmp{ key, nullptr, nullptr };
 		ref<jml_val> res = data[tmp];
 

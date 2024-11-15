@@ -28,7 +28,7 @@ export namespace core {
 		}
 	}
 
-	void format(strv arg, ref<buffer> buf) {
+	void format(stringview arg, ref<buffer> buf) {
 		for (auto i : range(arg.))
 	}
 

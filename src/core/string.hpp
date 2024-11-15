@@ -242,5 +242,5 @@ export namespace core {
 	};
 
 	typedef string_base<i8> string;
-	typedef stringview_base<i8> strv;
+	typedef stringview_base<i8> stringview;
 };

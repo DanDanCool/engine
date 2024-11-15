@@ -12,7 +12,7 @@ namespace core {
 	int convert_flags(access _access);
 	int get_fd(cref<handle> handle);
 
-	file_base::file_base(strv fname, access _access)
+	file_base::file_base(stringview fname, access _access)
 	: handle() {
 		int fd = 0;
 		int oflag = convert_flags(_access) | _O_CREAT;
