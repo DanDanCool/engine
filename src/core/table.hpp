@@ -104,7 +104,7 @@ export namespace core {
 			return res | (res == 0);
 		}
 
-		u32 _find(cref<key_type> key) const {
+		option<u32> _find(cref<key_type> key) const {
 			u32 h = _hash(key);
 			for (i32 i : range(TABLE_PROBE)) {
 				u32 idx = (h + i) % reserve;
@@ -114,17 +114,17 @@ export namespace core {
 				}
 			}
 
-			return U32_MAX;
+			return none_option;
 		}
 
 		bool has(cref<key_type> key) const {
-			return _find(key) != U32_MAX;
+			return _find(key);
 		}
 
 		void set(cref<key_type> key, val_type&& val) {
-			u32 idx = _find(key);
-			if (idx != U32_MAX) {
-				_vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx)) = forward_data(val);
+			auto idx = _find(key);
+			if (idx) {
+				_vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx.get())) = forward_data(val);
 				return;
 			}
 
@@ -143,15 +143,15 @@ export namespace core {
 		}
 
 		cref<val_type> get(cref<key_type> key) const {
-			u32 idx = _find(key);
-			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
-			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx));
+			auto idx = _find(key);
+			JOLLY_ASSERT(idx, "key does not exist in table");
+			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx.get()));
 		}
 
 		ref<val_type> get(cref<key_type> key) {
-			u32 idx = _find(key);
-			JOLLY_ASSERT(idx != U32_MAX, "key does not exist in table");
-			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx));
+			auto idx = _find(key);
+			JOLLY_ASSERT(idx, "key does not exist in table");
+			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx.get()));
 		}
 
 		cref<key_type> get_key(u32 idx) const {
@@ -171,19 +171,19 @@ export namespace core {
 		}
 
 		void del(cref<key_type> key) {
-			u32 sparse_idx = _find(key);
-			JOLLY_ASSERT(sparse_idx != U32_MAX, "key does not exist in table");
+			auto sparse_idx = _find(key);
+			JOLLY_ASSERT(sparse_idx, "key does not exist in table");
 
-			u32 dense_idx = _keys.get<SPARSE_INDEX>(sparse_idx);
+			u32 dense_idx = _keys.get<SPARSE_INDEX>(sparse_idx.get());
 			_vals.del(dense_idx);
 			_keys.get<SPARSE_INDEX>(_vals.get<DENSE_INDEX>(dense_idx)) = dense_idx;
 
-			ref<key_type> _key = _keys.get<KEY_INDEX>(sparse_idx);
+			ref<key_type> _key = _keys.get<KEY_INDEX>(sparse_idx.get());
 			core::destroy(&_key);
 			zero8(bytes(_key), sizeof(key_type));
 
-			_keys.get<HASH_INDEX>(sparse_idx) = 0;
-			_keys.get<SPARSE_INDEX>(sparse_idx) = 0;
+			_keys.get<HASH_INDEX>(sparse_idx.get()) = 0;
+			_keys.get<SPARSE_INDEX>(sparse_idx.get()) = 0;
 
 			size--;
 		}
@@ -193,13 +193,13 @@ export namespace core {
 		}
 
 		ref<val_type> operator[](cref<key_type> key) {
-			u32 idx = _find(key);
-			if (idx == U32_MAX) {
+			auto idx = _find(key);
+			if (!idx) {
 				set(key, forward_data(val_type()));
 				return get(key);
 			}
 
-			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx));
+			return _vals.get<VAL_INDEX>(_keys.get<SPARSE_INDEX>(idx.get()));
 		}
 
 		struct iterator_base {

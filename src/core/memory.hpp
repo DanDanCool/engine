@@ -35,11 +35,14 @@ export namespace core {
 		ptr.data = (ptr<u8>)aligned_alloc(DEFAULT_ALIGNMENT, size);
 #endif
 		ptr.size = size;
+
+		JOLLY_CORE_ASSERT(ptr.data);
 		zero256(ptr.data, (u32)ptr.size);
 		return ptr;
 	}
 
 	void free256(ptr<void> ptr) {
+		JOLLY_CORE_ASSERT(ptr);
 #ifdef JOLLY_WIN32
 		_aligned_free(ptr);
 #else
@@ -51,11 +54,14 @@ export namespace core {
 		membuf ptr = {0};
 		ptr.size = size;
 		ptr.data = (ptr<u8>)malloc(size);
+
+		JOLLY_CORE_ASSERT(ptr.data);
 		zero8(ptr.data, (u32)ptr.size);
 		return ptr;
 	}
 
 	void free8(ptr<void> ptr) {
+		JOLLY_CORE_ASSERT(ptr);
 		free(ptr);
 	}
 

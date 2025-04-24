@@ -94,4 +94,61 @@ export namespace core {
 		tmp = tmp > max ? max : tmp;
 		return tmp;
 	}
+
+	template <typename Impl>
+	struct monad {
+		ref<Impl> derived() {
+			return *(Impl*)this;
+		}
+
+		Impl some_then(auto fn) {
+			if (derived()) {
+				return fn(derived());
+			}
+			return derived();
+		}
+
+		Impl none_then(auto fn) {
+			if (!derived()) {
+				return fn(derived());
+			}
+			return derived();
+		}
+	};
+
+	struct _none_option {
+	} none_option;
+
+	template <typename T>
+	struct option : public monad<option<T>> {
+		using type = T;
+
+		option(T _value)
+		: value(_value), some(true) {}
+
+		option()
+		: value(), some(false) {}
+
+		option(_none_option)
+		: value(), some(false) {}
+
+		type get() const {
+			JOLLY_CORE_ASSERT(some);
+			return value;
+		}
+
+		type get_or(type other) const {
+			if (some) {
+				return value;
+			}
+			return other;
+		}
+
+		operator bool() const {
+			return some;
+		}
+
+		type value;
+		bool some;
+	};
 }

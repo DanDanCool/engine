@@ -27,14 +27,14 @@ namespace core {
 		_close(fd);
 	}
 
-	u32 file_base::write(membuf buf) {
+	option<u32> file_base::write(membuf buf) {
 		int fd = get_fd(handle);
 		int bytes = _write(fd, buf.data, (u32)buf.size);
 		return bytes;
 	}
 
 	// if buf already has memory allocated this will cause a memory leak
-	u32 file_base::read(ref<vector<u8>> buf) {
+	option<u32> file_base::read(ref<vector<u8>> buf) {
 		int fd = get_fd(handle);
 
 		i32 bytes = (i32)_lseek(fd, 0, SEEK_END);
@@ -48,7 +48,7 @@ namespace core {
 		return bytes;
 	}
 
-	u32 file_base::read(ref<buffer> buf) {
+	option<u32> file_base::read(ref<buffer> buf) {
 		int fd = get_fd(handle);
 		int bytes = _read(fd, buf.data + buf.index, (u32)(buffer::size - buf.index));
 		buf.index += bytes;

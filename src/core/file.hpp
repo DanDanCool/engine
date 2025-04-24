@@ -35,9 +35,9 @@ export namespace core {
 			return *this;
 		}
 
-		virtual u32 write(membuf buf);
-		virtual u32 read(ref<buffer> buf);
-		virtual u32 read(ref<vector<u8>> buf); // read everything
+		virtual option<u32> write(membuf buf);
+		virtual option<u32> read(ref<buffer> buf);
+		virtual option<u32> read(ref<vector<u8>> buf); // read everything
 
 		void flush();
 
@@ -68,15 +68,15 @@ export namespace core {
 			return *this;
 		}
 
-		virtual u32 write(membuf buf) {
+		virtual option<u32> write(membuf buf) {
 			u32 bytes = buf.size;
 			buf = data.write(buf);
 			bytes -= buf.size;
 
 			while (buf.size) {
-				u32 tmp = file_base::write(membuf{ data.data, data.index });
+				auto tmp = file_base::write(membuf{ data.data, data.index });
 				if (!tmp) return (u32)bytes;
-				bytes += tmp;
+				bytes += tmp.get();
 
 				data.flush();
 				buf = data.write(buf);
@@ -85,25 +85,25 @@ export namespace core {
 			return bytes;
 		}
 
-		u32 write() {
-			u32 bytes = file_base::write(membuf{ data.data, data.index });
+		option<u32> write() {
+			auto bytes = file_base::write(membuf{ data.data, data.index });
 			data.flush();
 			return bytes;
 		}
 
-		u32 write(u8 c) {
+		option<u32> write(u8 c) {
 			return write(membuf{&c, 1});
 		}
 
-		u32 read(ref<buffer> buf) {
+		option<u32> read(ref<buffer> buf) {
 			return file_base::read(buf);
 		}
 
-		u32 read(ref<vector<u8>> buf) {
+		option<u32> read(ref<vector<u8>> buf) {
 			return file_base::read(buf);
 		}
 
-		u32 read() {
+		option<u32> read() {
 			return file_base::read(data);
 		}
 
